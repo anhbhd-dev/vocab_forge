@@ -51,6 +51,16 @@ NGUYÊN TẮC ƯU TIÊN (theo thứ tự):
    phải cụ thể (tần suất, độ khó đoán nghĩa từ các phần cấu thành, mức độ dễ nhầm),
    không chung chung.
 6. Giới hạn tối đa 15 ứng viên mỗi lần gọi, ưu tiên chất lượng hơn số lượng.
+7. KHOẢNG BAND: chỉ trích các mục từ hữu ích cho người học trong khoảng từ band_min đến
+   band_max. Quy đổi tham chiếu band ↔ CEFR:
+   - band 4.5–5.5 → B1
+   - band 6.0–6.5 → B2
+   - band 7.0–8.0 → C1
+   - band 8.5–9.0 → C2
+   Bỏ mục quá dễ so với band_min (người học ở mức đó đã dùng thành thạo) và mục quá hiếm
+   so với band_max (chưa dùng tới, học vào sẽ quên). Khoảng càng rộng thì càng trải đều
+   các mức độ, KHÔNG dồn hết vào một mức. Trường cefr_level của mỗi ứng viên phải phản
+   ánh đúng mức đã quy đổi ở trên.
 
 Trả về CHỈ một JSON object theo đúng schema được cung cấp, không thêm text giải thích
 nào khác, không dùng markdown code block.

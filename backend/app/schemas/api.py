@@ -5,7 +5,7 @@ from __future__ import annotations
 import warnings
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 warnings.filterwarnings(
     "ignore", message='Field name "register".*', category=UserWarning
@@ -37,12 +37,16 @@ class UserOut(BaseModel):
     id: str
     email: str
     daily_new_word_goal: int
+    daily_new_min: int
+    daily_new_max: int
     timezone: str
     created_at: str
 
 
 class UserSettingsUpdate(BaseModel):
     daily_new_word_goal: int | None = Field(default=None, ge=1, le=100)
+    daily_new_min: int | None = Field(default=None, ge=1, le=100)
+    daily_new_max: int | None = Field(default=None, ge=1, le=100)
     timezone: str | None = None
 
 
@@ -124,7 +128,17 @@ class IngestionJobCreate(BaseModel):
     raw_text: str | None = None
     url: str | None = None
     deck_id: str | None = None
-    target_ielts_band: float = 7.0
+    # Khoảng band cần quét, vd 5.0 → 8.0 để lấy hết từ mức hiện tại tới mức nhắm tới.
+    band_min: float = Field(default=5.0, ge=4.0, le=9.0)
+    band_max: float = Field(default=8.0, ge=4.0, le=9.0)
+
+    @field_validator("band_max")
+    @classmethod
+    def _max_not_below_min(cls, value: float, info):
+        band_min = info.data.get("band_min")
+        if band_min is not None and value < band_min:
+            raise ValueError("band_max không được nhỏ hơn band_min")
+        return value
 
 
 class IngestionJobOut(BaseModel):

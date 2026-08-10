@@ -25,7 +25,10 @@ export function ImportPage() {
   const [source, setSource] = useState<'pasted_text' | 'url'>('pasted_text')
   const [text, setText] = useState('')
   const [url, setUrl] = useState('')
-  const [band, setBand] = useState(7)
+  // Khoảng band thay vì một mức: một bài đọc chứa từ ở nhiều độ khó, người học thường
+  // muốn quét từ mức đang có tới mức đang nhắm tới.
+  const [bandMin, setBandMin] = useState(5)
+  const [bandMax, setBandMax] = useState(8)
   const [jobId, setJobId] = useState<string | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -37,7 +40,8 @@ export function ImportPage() {
         source_type: source,
         raw_text: source === 'pasted_text' ? text : undefined,
         url: source === 'url' ? url : undefined,
-        target_ielts_band: band,
+        band_min: bandMin,
+        band_max: bandMax,
       })
       setJobId(job_id)
 
@@ -94,7 +98,8 @@ export function ImportPage() {
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Nhập bài đọc</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Agent trích các collocation học thuật đáng học — ưu tiên cụm từ, không phải từ
-          đơn lẻ. Bạn duyệt trước khi thẻ được tạo.
+          đơn lẻ. Bạn duyệt trước khi thẻ được tạo. Khoảng band quyết định độ khó của từ
+          được lấy: rộng thì trải đều nhiều mức, hẹp thì tập trung đúng một mức.
         </p>
       </header>
 
@@ -131,18 +136,43 @@ export function ImportPage() {
 
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Label htmlFor="band" className="text-muted-foreground">
-                Band mục tiêu
+              <Label htmlFor="band-min" className="text-muted-foreground">
+                Khoảng band
               </Label>
               <Input
-                id="band"
+                id="band-min"
                 type="number"
-                min={5}
+                min={4}
                 max={9}
                 step={0.5}
-                value={band}
-                onChange={(event) => setBand(Number(event.target.value))}
+                value={bandMin}
+                // Kéo band_max lên theo để không bao giờ gửi lên khoảng ngược — backend
+                // từ chối, mà báo lỗi sau khi bấm thì người dùng mất công quay lại sửa.
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  setBandMin(value)
+                  if (value > bandMax) setBandMax(value)
+                }}
                 className="tnum w-20"
+                aria-label="Band thấp nhất"
+              />
+              <span className="text-muted-foreground" aria-hidden>
+                →
+              </span>
+              <Input
+                id="band-max"
+                type="number"
+                min={4}
+                max={9}
+                step={0.5}
+                value={bandMax}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  setBandMax(value)
+                  if (value < bandMin) setBandMin(value)
+                }}
+                className="tnum w-20"
+                aria-label="Band cao nhất"
               />
             </div>
             <Button

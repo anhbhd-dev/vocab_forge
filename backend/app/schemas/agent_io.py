@@ -17,7 +17,32 @@ warnings.filterwarnings(
     "ignore", message='Field name "register".*', category=UserWarning
 )
 
-from pydantic import BaseModel, ConfigDict, Field
+import re  # noqa: E402
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator  # noqa: E402
+
+# DeepSeek là model Trung Quốc và thỉnh thoảng trôi về tiếng Trung ở những trường đáng
+# lẽ phải là tiếng Việt — người học mở thẻ ra thấy "全球范围内的下降或减少" thay vì nghĩa
+# tiếng Việt. Prompt đã nói rõ ngôn ngữ nhưng nói không đủ, nên chặn thêm ở tầng schema:
+# ValidationError khiến runner gọi lại LLM kèm lý do (xem agents/runner.py), và cũng
+# khiến các entry cache đã nhiễm bị bỏ qua thay vì trả về mãi.
+#
+# Dải ký tự: Kana, CJK ext-A, CJK thống nhất, dạng tương thích, Hangul. Tiếng Việt viết
+# bằng chữ Latin có dấu nên không bao giờ chạm vào các dải này.
+_CJK_RE = re.compile(
+    r"[぀-ヿ㐀-䶿一-鿿豈-﫿가-힯]"
+)
+
+
+def _reject_cjk(value: str | None) -> str | None:
+    """Từ chối chuỗi chứa chữ Hán/Kana/Hangul — dùng cho các trường tiếng Việt."""
+    if value and _CJK_RE.search(value):
+        raise ValueError(
+            "phải viết bằng TIẾNG VIỆT (chữ Latin có dấu), không được dùng chữ Hán, "
+            "Kana hay Hangul"
+        )
+    return value
+
 
 ItemType = Literal["single_word", "collocation", "phrasal_verb", "idiom"]
 EssayType = Literal[
@@ -35,8 +60,20 @@ class StrictModel(BaseModel):
 # ----------------------------------------------------------------- Agent 1
 class ExtractionInput(StrictModel):
     text: str
-    target_ielts_band: float = 7.0
+    # Khoảng band thay cho một band duy nhất: một bài đọc thường chứa từ ở nhiều mức, và
+    # người học muốn quét hết từ mức mình đang có tới mức mình nhắm tới (vd 5.0 → 8.0)
+    # thay vì chỉ lấy đúng một lát cắt. Prompt quy đổi khoảng này sang CEFR (nguyên tắc #7).
+    band_min: float = Field(default=5.0, ge=4.0, le=9.0)
+    band_max: float = Field(default=8.0, ge=4.0, le=9.0)
     existing_items: list[str] = Field(default_factory=list)
+
+    @field_validator("band_max")
+    @classmethod
+    def _max_not_below_min(cls, value: float, info):
+        band_min = info.data.get("band_min")
+        if band_min is not None and value < band_min:
+            raise ValueError("band_max không được nhỏ hơn band_min")
+        return value
 
 
 class ExtractionCandidate(StrictModel):
@@ -86,6 +123,8 @@ class ClusterMember(StrictModel):
     sense_id: str
     distinguishing_note: str | None = None
 
+    _no_cjk_note = field_validator("distinguishing_note")(_reject_cjk)
+
 
 class ClusterItem(StrictModel):
     cluster_label: str
@@ -110,6 +149,8 @@ class MnemonicOutput(StrictModel):
     mnemonic_text: str
     mnemonic_type: MnemonicType = "keyword_dual_coding"
 
+    _no_cjk_text = field_validator("mnemonic_text")(_reject_cjk)
+
 
 # ----------------------------------------------------------------- Agent 5
 class ProductionGradingInput(StrictModel):
@@ -124,6 +165,8 @@ class ProductionGradingOutput(StrictModel):
     error_type: ProductionErrorType = "none"
     feedback_text: str
     corrected_sentence: str | None = None
+
+    _no_cjk_feedback = field_validator("feedback_text")(_reject_cjk)
 
 
 # ------------------------------------------------- Agent mở rộng: Sense Agent
@@ -140,6 +183,8 @@ class SenseDefinition(StrictModel):
     part_of_speech: str | None = None
     register: Register | None = None
     needs_mnemonic: bool = False
+
+    _no_cjk_vi = field_validator("definition_vi")(_reject_cjk)
 
 
 class SenseOutput(StrictModel):

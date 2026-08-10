@@ -34,7 +34,10 @@ export type EssayType =
 export interface User {
   id: string
   email: string
+  /** Mục tiêu hiện tại — ramp-up tự chỉnh trong khoảng min/max dưới đây. */
   daily_new_word_goal: number
+  daily_new_min: number
+  daily_new_max: number
   timezone: string
   created_at: string
 }

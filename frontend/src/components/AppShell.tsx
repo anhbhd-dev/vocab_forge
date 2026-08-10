@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { BarChart3, BookOpen, FilePlus2, LogOut, Moon, NotebookPen, Sun } from 'lucide-react'
+import {
+  BarChart3,
+  BookOpen,
+  FilePlus2,
+  LogOut,
+  Moon,
+  NotebookPen,
+  Settings,
+  Sun,
+} from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 
@@ -9,6 +18,7 @@ const NAV = [
   { to: '/review', label: 'Ôn tập', icon: BookOpen, end: false },
   { to: '/import', label: 'Nhập bài', icon: FilePlus2, end: false },
   { to: '/analytics', label: 'Phân tích', icon: BarChart3, end: false },
+  { to: '/settings', label: 'Cài đặt', icon: Settings, end: false },
 ]
 
 function ThemeToggle() {

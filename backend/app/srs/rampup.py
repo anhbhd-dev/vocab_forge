@@ -8,6 +8,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+# Ngưỡng MẶC ĐỊNH. Mỗi người học có thể tự đặt khoảng riêng (users.daily_new_min/max);
+# hai hằng số này chỉ dùng khi không truyền vào.
 MIN_DAILY_NEW = 5
 MAX_DAILY_NEW = 30
 STEP = 5
@@ -35,17 +37,23 @@ def evaluate_daily_goal(
     retention_7d: float | None,
     due_count_today: int,
     daily_retention_desc: Sequence[float] = (),
+    min_goal: int = MIN_DAILY_NEW,
+    max_goal: int = MAX_DAILY_NEW,
 ) -> RampUpDecision:
     """Quyết định tăng/giảm/giữ nguyên `daily_new_word_goal`.
 
     `daily_retention_desc`: retention theo từng ngày, mới nhất đứng đầu — dùng để kiểm
     tra điều kiện "< 75% trong 3 ngày LIÊN TIẾP".
+
+    `min_goal`/`max_goal`: khoảng người học tự đặt. Ramp-up không bao giờ đưa mục tiêu
+    ra ngoài khoảng này — người học nói "20–30 từ/ngày" thì hệ thống phải tôn trọng,
+    kể cả khi retention cao ngất cũng không đẩy lên 35.
     """
     recent = list(daily_retention_desc)[:LOWER_CONSECUTIVE_DAYS]
     if len(recent) == LOWER_CONSECUTIVE_DAYS and all(
         r < LOWER_RETENTION_THRESHOLD for r in recent
     ):
-        lowered = max(MIN_DAILY_NEW, current_goal - STEP)
+        lowered = max(min_goal, current_goal - STEP)
         return RampUpDecision(
             current_goal=current_goal,
             recommended_goal=lowered,
@@ -62,14 +70,17 @@ def evaluate_daily_goal(
             current_goal, current_goal, "hold", "Chưa đủ dữ liệu review 7 ngày."
         )
 
-    if current_goal >= MAX_DAILY_NEW:
+    if current_goal >= max_goal:
         return RampUpDecision(
-            current_goal, current_goal, "hold", "Đã đạt mục tiêu 30 từ/ngày."
+            current_goal,
+            current_goal,
+            "hold",
+            f"Đã chạm trần {max_goal} từ/ngày bạn đặt.",
         )
 
     due_ceiling = current_goal * DUE_LOAD_MULTIPLIER
     if retention_7d >= RAISE_RETENTION_THRESHOLD and due_count_today <= due_ceiling:
-        raised = min(MAX_DAILY_NEW, current_goal + STEP)
+        raised = min(max_goal, current_goal + STEP)
         return RampUpDecision(
             current_goal=current_goal,
             recommended_goal=raised,

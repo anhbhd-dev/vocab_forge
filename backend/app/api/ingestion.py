@@ -62,7 +62,9 @@ async def create_job(
     session.add(job)
     await session.commit()
 
-    background.add_task(run_extraction_job, job.id, payload.target_ielts_band)
+    background.add_task(
+        run_extraction_job, job.id, payload.band_min, payload.band_max
+    )
     return {"job_id": job.id, "status": "pending"}
 
 

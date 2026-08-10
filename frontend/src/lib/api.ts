@@ -94,7 +94,12 @@ export const api = {
   login: (email: string, password: string) =>
     post<{ access_token: string }>('/api/auth/login', { email, password }),
   me: () => request<User>('/api/users/me'),
-  updateSettings: (patch: { daily_new_word_goal?: number; timezone?: string }) =>
+  updateSettings: (patch: {
+    daily_new_word_goal?: number
+    daily_new_min?: number
+    daily_new_max?: number
+    timezone?: string
+  }) =>
     request<User>('/api/users/me/settings', {
       method: 'PATCH',
       body: JSON.stringify(patch),
@@ -117,7 +122,8 @@ export const api = {
     raw_text?: string
     url?: string
     deck_id?: string | null
-    target_ielts_band?: number
+    band_min?: number
+    band_max?: number
   }) => post<{ job_id: string; status: string }>('/api/ingestion/jobs', payload),
   job: (id: string) => request<IngestionJob>(`/api/ingestion/jobs/${id}`),
   candidates: (id: string) =>

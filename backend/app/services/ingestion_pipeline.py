@@ -63,7 +63,9 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------
 # Bước 1: Extraction
 # --------------------------------------------------------------------------
-async def run_extraction_job(job_id: str, target_ielts_band: float = 7.0) -> None:
+async def run_extraction_job(
+    job_id: str, band_min: float = 5.0, band_max: float = 8.0
+) -> None:
     """Background task: lấy text → Extraction Agent → ghi candidates chờ duyệt."""
     async with AsyncSessionLocal() as session:
         job = await session.get(IngestionJob, job_id)
@@ -86,7 +88,8 @@ async def run_extraction_job(job_id: str, target_ielts_band: float = 7.0) -> Non
                 session,
                 ExtractionInput(
                     text=text,
-                    target_ielts_band=target_ielts_band,
+                    band_min=band_min,
+                    band_max=band_max,
                     existing_items=existing,
                 ),
             )

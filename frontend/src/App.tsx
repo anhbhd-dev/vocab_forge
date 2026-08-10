@@ -6,6 +6,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ReviewPage } from '@/pages/ReviewPage'
 import { ImportPage } from '@/pages/ImportPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 import { Toaster } from '@/components/ui/sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -41,6 +42,7 @@ function Gate() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/review" element={<ReviewPage />} />
         <Route path="/import" element={<ImportPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route
           path="/analytics"
           element={

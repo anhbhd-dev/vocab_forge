@@ -70,10 +70,28 @@ async def read_me(user: CurrentUser) -> User:
 async def update_settings(
     payload: UserSettingsUpdate, user: CurrentUser, session: SessionDep
 ) -> User:
+    if payload.daily_new_min is not None:
+        user.daily_new_min = payload.daily_new_min
+    if payload.daily_new_max is not None:
+        user.daily_new_max = payload.daily_new_max
+    if user.daily_new_min > user.daily_new_max:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Số từ tối thiểu không được lớn hơn số từ tối đa",
+        )
+
     if payload.daily_new_word_goal is not None:
         user.daily_new_word_goal = payload.daily_new_word_goal
     if payload.timezone is not None:
         user.timezone = payload.timezone
+
+    # Kéo mục tiêu hiện tại vào trong khoảng vừa đặt. Thiếu bước này thì người học đặt
+    # "20–30 từ/ngày" xong vẫn chỉ nhận 10 từ mới mỗi ngày cho tới khi ramp-up bò lên
+    # từng nấc 5 — bấm lưu mà không thấy gì đổi thì đúng là tính năng hỏng.
+    user.daily_new_word_goal = min(
+        user.daily_new_max, max(user.daily_new_min, user.daily_new_word_goal)
+    )
+
     await session.commit()
     await session.refresh(user)
     return user

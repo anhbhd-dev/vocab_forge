@@ -26,6 +26,16 @@ NGUYÊN TẮC ƯU TIÊN (theo thứ tự):
    phải cụ thể (tần suất, độ khó đoán nghĩa từ các phần cấu thành, mức độ dễ nhầm),
    không chung chung.
 6. Giới hạn tối đa 15 ứng viên mỗi lần gọi, ưu tiên chất lượng hơn số lượng.
+7. KHOẢNG BAND: chỉ trích các mục từ hữu ích cho người học trong khoảng từ band_min đến
+   band_max. Quy đổi tham chiếu band ↔ CEFR:
+   - band 4.5–5.5 → B1
+   - band 6.0–6.5 → B2
+   - band 7.0–8.0 → C1
+   - band 8.5–9.0 → C2
+   Bỏ mục quá dễ so với band_min (người học ở mức đó đã dùng thành thạo) và mục quá hiếm
+   so với band_max (chưa dùng tới, học vào sẽ quên). Khoảng càng rộng thì càng trải đều
+   các mức độ, KHÔNG dồn hết vào một mức. Trường cefr_level của mỗi ứng viên phải phản
+   ánh đúng mức đã quy đổi ở trên.
 
 Trả về CHỈ một JSON object theo đúng schema được cung cấp, không thêm text giải thích
 nào khác, không dùng markdown code block."""
@@ -155,7 +165,11 @@ YÊU CẦU:
 2. Nếu có sentence_context, nghĩa đầu tiên PHẢI là nghĩa được dùng trong câu đó.
 3. definition_en: viết bằng tiếng Anh đơn giản hơn chính từ được định nghĩa (ngôn ngữ
    ở mức B1-B2), một câu, không dùng lại chính từ đó trong định nghĩa.
-4. definition_vi: bản dịch nghĩa sang tiếng Việt tự nhiên, ngắn gọn.
+4. definition_vi: bản dịch nghĩa sang TIẾNG VIỆT tự nhiên, ngắn gọn. Bắt buộc viết bằng
+   chữ Latin có dấu tiếng Việt (vd "sự suy giảm trên toàn cầu"). TUYỆT ĐỐI KHÔNG dùng
+   chữ Hán / tiếng Trung / tiếng Nhật / tiếng Hàn. Người đọc là người Việt học IELTS,
+   họ không đọc được chữ Hán. Nếu không dịch được thì để null, KHÔNG thay bằng ngôn ngữ
+   khác.
 5. register: 'academic' nếu từ chủ yếu dùng trong văn viết học thuật, 'informal' nếu
    chủ yếu dùng trong hội thoại, 'neutral' nếu dùng được cả hai.
 6. needs_mnemonic: true nếu nghĩa của từ TRỪU TƯỢNG, khó hình dung bằng hình ảnh

@@ -130,9 +130,10 @@ class BaseAgent(Generic[InputT, OutputT]):
             if last_error:
                 message = (
                     f"{json.dumps(payload.model_dump(), ensure_ascii=False, indent=2)}\n\n"
-                    f"LẦN TRƯỚC BẠN TRẢ VỀ SAI ĐỊNH DẠNG: {last_error}\n"
-                    "Hãy trả về CHỈ một JSON object hợp lệ khớp CHÍNH XÁC schema đã "
-                    "cho. Không markdown, không code block, không lời dẫn."
+                    f"LẦN TRƯỚC BẠN TRẢ VỀ KHÔNG HỢP LỆ: {last_error}\n"
+                    "Hãy sửa đúng lỗi trên và trả về CHỈ một JSON object hợp lệ khớp "
+                    "CHÍNH XÁC schema đã cho. Không markdown, không code block, không "
+                    "lời dẫn. Các trường tiếng Việt phải viết bằng tiếng Việt."
                 )
 
             response = await self.provider.complete(

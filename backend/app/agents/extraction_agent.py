@@ -26,7 +26,15 @@ class ExtractionAgent(BaseAgent[ExtractionInput, ExtractionOutput]):
         # riêng user, không đổi bản chất "bài đọc này có những cụm nào đáng học". Giữ
         # nó trong key sẽ khiến 2 user cùng dán một bài đọc không bao giờ share cache.
         # Bù lại, kết quả cache được lọc lại theo existing_items ở `run_filtered`.
-        return {"text": payload.text}
+        #
+        # Khoảng band thì BẮT BUỘC phải nằm trong key: cùng một bài đọc nhưng quét band
+        # 5–6 và band 7–8 phải ra hai tập từ khác nhau. Thiếu nó thì lần quét thứ hai sẽ
+        # ăn cache của lần đầu và trả về sai mức độ.
+        return {
+            "text": payload.text,
+            "band_min": payload.band_min,
+            "band_max": payload.band_max,
+        }
 
     async def run_filtered(
         self, session, payload: ExtractionInput, use_cache: bool = True

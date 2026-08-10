@@ -75,6 +75,8 @@ async def overview(session: AsyncSession, user: User) -> dict:
         retention_7d=r7,
         due_count_today=int(due_today or 0),
         daily_retention_desc=await daily_retention(session, user.id, days=7),
+        min_goal=user.daily_new_min or 5,
+        max_goal=user.daily_new_max or 30,
     )
 
     return {
