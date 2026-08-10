@@ -37,7 +37,10 @@ class Settings(BaseSettings):
 
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"
+    deepseek_model: str = "deepseek-v4-flash"
+    # V4 bật thinking mặc định (effort=high). Agent ở đây chỉ cần JSON đúng schema,
+    # reasoning chỉ làm chậm và đắt thêm → tắt. Đặt True nếu muốn bật lại.
+    deepseek_thinking: bool = False
 
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"

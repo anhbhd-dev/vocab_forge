@@ -22,11 +22,15 @@ class DeepSeekProvider(LLMProvider):
         base_url: str | None = None,
         model: str | None = None,
         timeout: float | None = None,
+        thinking: bool | None = None,
     ) -> None:
         self._api_key = api_key if api_key is not None else settings.deepseek_api_key
         self._base_url = (base_url or settings.deepseek_base_url).rstrip("/")
         self._model = model or settings.deepseek_model
         self._timeout = timeout or settings.llm_timeout_seconds
+        self._thinking = (
+            thinking if thinking is not None else settings.deepseek_thinking
+        )
 
     @property
     def model(self) -> str:
@@ -56,6 +60,8 @@ class DeepSeekProvider(LLMProvider):
             "response_format": {"type": "json_object"},
             "temperature": 0.7,
             "stream": False,
+            # DeepSeek V4 bật thinking mặc định; agent chỉ cần JSON nên tắt cho nhanh/rẻ.
+            "thinking": {"type": "enabled" if self._thinking else "disabled"},
         }
 
         try:
