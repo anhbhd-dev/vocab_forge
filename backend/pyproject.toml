@@ -1,0 +1,43 @@
+[project]
+name = "vocabforge-backend"
+version = "0.1.0"
+description = "VocabForge Pro backend — SRS (FSRS) + AI agent layer for IELTS vocabulary"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    # PostgreSQL là DB chính; aiosqlite giữ lại để chạy test không cần Docker.
+    "asyncpg>=0.30",
+    "aiosqlite>=0.20",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "pyjwt>=2.9",
+    "bcrypt>=4.2",
+    "httpx>=0.27",
+    # Khoá version theo yêu cầu file 02 mục 1 (2): thư viện FSRS phải pin cụ thể.
+    # 6.3.2 là bản mới nhất tại thời điểm code và chỉ hỗ trợ FSRS-6.
+    # TODO(FSRS-7): nâng lên khi py-fsrs phát hành bản có fractional interval + 8 tham số.
+    "fsrs==6.3.2",
+    # đọc PDF cho Content Ingestion (file 00 mục 5) — thuần Python, không kéo torch
+    "pypdf>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "anyio>=4.6",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+log_cli = false
+log_level = "WARNING"
+filterwarnings = [
+    "ignore:Field name \"register\".*:UserWarning",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

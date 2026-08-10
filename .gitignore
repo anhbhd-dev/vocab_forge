@@ -1,0 +1,44 @@
+# ---- Secrets / cấu hình môi trường ----
+# .env chứa DEEPSEEK_API_KEY, JWT_SECRET, mật khẩu Postgres — KHÔNG BAO GIỜ commit.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Node / frontend ----
+node_modules/
+frontend/dist/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Database cục bộ (dữ liệu thật nằm trong volume Docker) ----
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# ---- IDE / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

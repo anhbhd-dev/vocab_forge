@@ -1,0 +1,260 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+/* Font self-host qua @fontsource — không gọi Google Fonts CDN lúc chạy.
+   Bricolage Grotesque: font hiển thị CÓ CÁ TÍNH, chỉ dùng cho từ vựng + tiêu đề.
+   Inter: thân bài. JetBrains Mono: số liệu (chữ số đều bề rộng). */
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   VocabForge Pro — Design tokens: "SỔ TAY TỪ VỰNG"
+   Ẩn dụ: giấy · mực · bút dạ · bút đỏ chấm bài. Không phải dashboard SaaS.
+   Chi tiết và lý do chọn xem DESIGN_TOKENS.md.
+   ========================================================================== */
+
+:root {
+  /* --- Bảng màu gốc (6 màu có tên) --- */
+  --paper: #eff1ec; /* giấy tái chế, ngả xanh xám — KHÔNG phải cream ấm */
+  --paper-raised: #f7f8f5; /* trang giấy nổi lên trên nền sổ */
+  --ink: #1c2c3b; /* mực xanh đen — chữ chính */
+  --graphite: #6b7a88; /* chì — chữ phụ, chú thích */
+  --rule: #d9ddd4; /* đường kẻ / lề vở */
+  --highlight: #f2d06b; /* bút dạ vàng — đang học, cần chú ý */
+  --mint: #3e9e7a; /* bút dạ bạc hà — nhớ chắc, đúng */
+  --redpen: #c1453b; /* mực đỏ chấm bài — sai nghĩa */
+  --violet-pen: #7a5cc4; /* bút tím — sai kết hợp từ */
+
+  /* --- Ánh xạ sang biến của shadcn/ui --- */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper-raised);
+  --card-foreground: var(--ink);
+  --popover: var(--paper-raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper-raised);
+  --secondary: #e3e7dd;
+  --secondary-foreground: var(--ink);
+  --muted: #e6e9e1;
+  --muted-foreground: var(--graphite);
+  --accent: #e3e7dd;
+  --accent-foreground: var(--ink);
+  --destructive: var(--redpen);
+  --border: var(--rule);
+  --input: var(--rule);
+  --ring: var(--mint);
+
+  /* Recharts — dùng chính bảng bút dạ, không dùng palette chart mặc định */
+  --chart-1: var(--mint);
+  --chart-2: var(--highlight);
+  --chart-3: var(--violet-pen);
+  --chart-4: var(--redpen);
+  --chart-5: var(--graphite);
+
+  --sidebar: var(--paper-raised);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: var(--paper-raised);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--mint);
+
+  --radius: 0.75rem;
+
+  /* --- Mã màu theo error_type — NHẤT QUÁN toàn app (yêu cầu file 05) ---
+     Ẩn dụ bút chấm bài: đỏ = sai nghĩa (nặng nhất), tím = sai kết hợp từ,
+     vàng đậm = sai văn phong, chì = ngữ pháp/chính tả, mint = không lỗi. */
+  --err-meaning: var(--redpen);
+  --err-collocation: var(--violet-pen);
+  --err-register: #a9761b;
+  --err-grammar: var(--graphite);
+  --err-none: var(--mint);
+
+  /* --- Nút rating --- */
+  --rate-again: var(--redpen);
+  --rate-hard: #a9761b;
+  --rate-good: var(--mint);
+  --rate-easy: #3b7ea1;
+}
+
+/* Dark mode = "sổ tay dưới đèn bàn". Nền là mực xanh đen chứ KHÔNG phải đen
+   tuyền: đen tuyền + chữ trắng tạo quầng sáng, mỏi mắt khi ôn 20-30 phút liền. */
+.dark {
+  --paper: #12171b;
+  --paper-raised: #1a2128;
+  --ink: #e6ebef;
+  --graphite: #93a4b3;
+  --rule: #2a333c;
+  --highlight: #e8c55f;
+  --mint: #5fcfa4;
+  --redpen: #f08279;
+  --violet-pen: #a78bfa;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper-raised);
+  --card-foreground: var(--ink);
+  --popover: var(--paper-raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: #12171b;
+  --secondary: #232c34;
+  --secondary-foreground: var(--ink);
+  --muted: #212a32;
+  --muted-foreground: var(--graphite);
+  --accent: #232c34;
+  --accent-foreground: var(--ink);
+  --destructive: var(--redpen);
+  --border: var(--rule);
+  --input: var(--rule);
+  --ring: var(--mint);
+
+  --chart-1: var(--mint);
+  --chart-2: var(--highlight);
+  --chart-3: var(--violet-pen);
+  --chart-4: var(--redpen);
+  --chart-5: var(--graphite);
+
+  --sidebar: var(--paper-raised);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: #12171b;
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--mint);
+
+  --err-register: #e8c55f;
+  --rate-hard: #e8c55f;
+  --rate-easy: #7cb8d4;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Bricolage Grotesque Variable', 'Inter Variable', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Token riêng của sản phẩm — dùng như utility: bg-paper, text-graphite… */
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-graphite: var(--graphite);
+  --color-rule: var(--rule);
+  --color-highlight: var(--highlight);
+  --color-mint: var(--mint);
+  --color-redpen: var(--redpen);
+  --color-violet-pen: var(--violet-pen);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer utilities {
+  /* Chữ số tabular: cột thống kê không nhảy khi giá trị thay đổi. */
+  .tnum {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+
+  /* Giấy kẻ ô mờ — chi tiết "sổ tay", đủ nhạt để không cạnh tranh với chữ.
+     Dùng cho NỀN TRANG, không dùng bên trong thẻ đang đọc. */
+  .paper-grid {
+    background-image:
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--rule) 55%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--rule) 55%, transparent) 1px,
+        transparent 1px
+      );
+    background-size: 28px 28px;
+  }
+
+  /* Đường lề dọc của vở — MỘT đường có chức năng (mốc bắt đầu nội dung),
+     không phải lưới hairline trang trí kiểu báo in. */
+  .paper-margin {
+    box-shadow: inset 2px 0 0 0 color-mix(in srgb, var(--redpen) 32%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
