@@ -59,6 +59,7 @@ from app.services.lexical_dedup import (
     existing_surface_forms,
     get_or_create_lexical_item,
 )
+from app.services.notifications import notify
 from app.services.phonetics import to_ipa
 from app.services.tts import synthesize_many
 
@@ -122,6 +123,32 @@ async def run_extraction_job(
 
             job.status = "done"
             job.error_message = None
+            # Người học đã rời màn hình từ lâu — thông báo là cách duy nhất mời họ quay
+            # lại duyệt. Không có candidate nào cũng phải báo, nếu không thì bài đọc coi
+            # như rơi vào im lặng và họ tưởng hệ thống treo.
+            if output.candidates:
+                await notify(
+                    session,
+                    user_id=job.user_id,
+                    type="extraction_done",
+                    title=f"Đã trích xuất {len(output.candidates)} từ",
+                    body="Bấm để duyệt và thêm vào kho từ của bạn.",
+                    job_id=job.id,
+                    count=len(output.candidates),
+                )
+            else:
+                await notify(
+                    session,
+                    user_id=job.user_id,
+                    type="extraction_done",
+                    title="Không tìm thấy từ mới nào",
+                    body=(
+                        "Bài đọc này không có mục từ nào trong khoảng band bạn chọn, "
+                        "hoặc bạn đã có hết rồi."
+                    ),
+                    job_id=job.id,
+                    count=0,
+                )
             await session.commit()
             logger.info(
                 "job %s: extraction xong, %d candidates chờ duyệt",
@@ -177,18 +204,40 @@ async def run_enrichment_job(
             await maybe_run_cluster_batch(session, user_id)
             await session.commit()
 
+            created = len(lexical_item_ids) - len(failures)
             if job_id:
                 job = await session.get(IngestionJob, job_id)
                 if job is not None:
                     if failures and len(failures) == len(lexical_item_ids):
                         job.status = "failed"
                         job.error_message = f"Enrich thất bại toàn bộ: {failures[0]}"
+                        await notify(
+                            session,
+                            user_id=user_id,
+                            type="enrichment_failed",
+                            title="Tạo thẻ thất bại",
+                            body=str(failures[0])[:300],
+                            job_id=job.id,
+                        )
                     else:
                         job.status = "done"
                         job.error_message = (
                             f"{len(failures)}/{len(lexical_item_ids)} item enrich lỗi"
                             if failures
                             else None
+                        )
+                        await notify(
+                            session,
+                            user_id=user_id,
+                            type="enrichment_done",
+                            title=f"{created} mục từ đã thành thẻ",
+                            body=(
+                                f"{len(failures)} mục lỗi, phần còn lại đã vào hàng đợi ôn."
+                                if failures
+                                else "Nghĩa, câu ví dụ và mẹo nhớ đã sẵn sàng. Bấm để ôn."
+                            ),
+                            job_id=job.id,
+                            count=created,
                         )
                     job.completed_at = to_iso(utcnow())
                     await session.commit()
@@ -552,4 +601,14 @@ async def _fail_job(session: AsyncSession, job_id: str, message: str) -> None:
     job.status = "failed"
     job.error_message = message[:2000]
     job.completed_at = to_iso(utcnow())
+    # Thất bại càng phải báo: người học đã rời màn hình, im lặng thì họ chờ mãi một
+    # thứ không bao giờ tới.
+    await notify(
+        session,
+        user_id=job.user_id,
+        type="extraction_failed",
+        title="Trích xuất thất bại",
+        body=message[:300],
+        job_id=job.id,
+    )
     await session.commit()

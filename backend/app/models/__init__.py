@@ -10,6 +10,7 @@ from app.models.lexical import (
     Mnemonic,
     Sense,
 )
+from app.models.notification import Notification
 from app.models.production import ProductionAttempt
 from app.models.srs import Card, ReviewLog
 from app.models.user import Deck, User
@@ -18,6 +19,7 @@ __all__ = [
     "Base",
     "AgentCache",
     "Card",
+    "Notification",
     "ConfusionCluster",
     "ConfusionClusterMember",
     "Deck",

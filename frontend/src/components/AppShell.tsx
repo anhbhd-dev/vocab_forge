@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import { useVoice } from '@/lib/voice'
+import { NotificationBell } from '@/components/NotificationBell'
 import { Button } from '@/components/ui/button'
 
 const NAV = [
@@ -46,7 +47,8 @@ function VoiceToggle() {
       className="gap-1.5 px-2 text-muted-foreground"
     >
       <AudioLines className="size-4" aria-hidden />
-      <span className="text-xs">{male ? 'Nam' : 'Nữ'}</span>
+      {/* Trên điện thoại chỉ còn icon: nhãn chữ ở đây là thứ đẩy thanh này tràn ngang. */}
+      <span className="hidden text-xs sm:inline">{male ? 'Nam' : 'Nữ'}</span>
     </Button>
   )
 }
@@ -81,17 +83,22 @@ export function AppShell() {
   return (
     <div className="paper-grid min-h-screen">
       <header className="sticky top-0 z-20 border-b bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-5">
-          <span className="font-heading mr-3 font-semibold tracking-tight">VocabForge</span>
+        {/* min-w-0 trên nav + shrink-0 trên cụm nút phải: hàng này có 5 mục điều hướng
+            và 4 nút, cộng lại rộng hơn màn hình điện thoại. Không cho nav co lại thì nó
+            đẩy cả TRANG tràn ngang — mọi trang bên dưới bị cắt mất mép phải. */}
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-1.5 px-3 sm:gap-2 sm:px-5">
+          <span className="font-heading mr-3 hidden font-semibold tracking-tight sm:inline">
+            VocabForge
+          </span>
 
-          <nav className="flex items-center gap-1">
+          <nav className="scrollbar-none flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto sm:gap-1">
             {NAV.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
                 className={({ isActive }) =>
-                  `flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm transition ${
+                  `flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm transition sm:px-2.5 ${
                     isActive
                       ? 'bg-secondary text-foreground'
                       : 'text-muted-foreground hover:text-foreground'
@@ -104,8 +111,9 @@ export function AppShell() {
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
             <span className="hidden text-xs text-muted-foreground md:inline">{user?.email}</span>
+            <NotificationBell />
             <VoiceToggle />
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={logout} aria-label="Đăng xuất">
@@ -115,7 +123,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-5 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-5 sm:py-8">
         <Outlet />
       </main>
     </div>

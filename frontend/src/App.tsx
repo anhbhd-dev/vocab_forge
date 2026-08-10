@@ -42,6 +42,9 @@ function Gate() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/review" element={<ReviewPage />} />
         <Route path="/import" element={<ImportPage />} />
+        {/* Vào thẳng màn hình duyệt của một job cụ thể — đích của thông báo
+            "đã trích xuất xong N từ". */}
+        <Route path="/import/:jobId" element={<ImportPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route
           path="/analytics"

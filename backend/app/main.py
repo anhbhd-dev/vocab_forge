@@ -11,7 +11,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.agents.base import AgentSchemaError, LLMError
-from app.api import analytics, auth, clusters, decks, ingestion, production, review
+from app.api import (
+    analytics,
+    auth,
+    clusters,
+    decks,
+    ingestion,
+    notifications,
+    production,
+    review,
+)
 from app.core.config import settings
 from app.core.db import init_db, ping
 from app.services.phonetics import phonetics_backend
@@ -74,7 +83,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, decks, ingestion, review, production, clusters, analytics):
+for module in (
+    auth,
+    decks,
+    ingestion,
+    review,
+    production,
+    clusters,
+    analytics,
+    notifications,
+):
     app.include_router(module.router)
 
 # Audio phát âm phục vụ TĨNH, không đi qua route Python nào: vòng review chỉ nhận một

@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Check, FileText, Link2, Loader2, Sparkles } from 'lucide-react'
+import { Bell, Check, FileText, Link2, Loader2, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, pollUntil } from '@/lib/api'
 import type { Candidate } from '@/lib/types'
@@ -12,15 +12,25 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 
-type Phase = 'input' | 'extracting' | 'review' | 'enriching' | 'done'
+type Phase = 'input' | 'queued' | 'review' | 'enriching' | 'done'
 
 /**
  * Luồng ingestion theo file 03 mục 6: nhập bài đọc → Extraction Agent → **user duyệt**
  * → enrichment chạy nền. Điểm mấu chốt: KHÔNG tự động thêm hết ứng viên; mỗi ứng viên
  * hiện kèm `reason` của agent để người học quyết định có căn cứ.
+ *
+ * CHỜ ĐỢI: gửi bài xong là báo "đã nhận" NGAY rồi trả lại quyền điều khiển, chứ không
+ * khoá màn hình bằng spinner. Trích xuất là việc của vòng agent, mất từ vài chục giây
+ * tới vài phút — bắt người học ngồi nhìn suốt quãng đó vừa phí thời gian đáng lẽ dùng
+ * để ôn, vừa mất trắng nếu họ lỡ đóng tab. Xong việc thì chuông thông báo trên thanh
+ * điều hướng sáng lên, bấm vào là quay lại đúng màn hình duyệt này
+ * (`/import/:jobId` → `NotificationBell`).
+ *
+ * Ai muốn đứng đợi vẫn đợi được: trang tự dò nền và tự nhảy sang bước duyệt khi xong.
  */
 export function ImportPage() {
   const navigate = useNavigate()
+  const { jobId: jobIdParam } = useParams()
   const [phase, setPhase] = useState<Phase>('input')
   const [source, setSource] = useState<'pasted_text' | 'url'>('pasted_text')
   const [text, setText] = useState('')
@@ -33,8 +43,24 @@ export function ImportPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
+  const openCandidates = useCallback(async (id: string) => {
+    const list = await api.candidates(id)
+    setJobId(id)
+    setCandidates(list)
+    setSelected(new Set(list.map((c) => c.lexical_item_id)))
+    setPhase('review')
+  }, [])
+
+  // Tới từ thông báo (`/import/:jobId`): mở thẳng danh sách chờ duyệt của job đó.
+  useEffect(() => {
+    if (!jobIdParam) return
+    openCandidates(jobIdParam).catch((err) => {
+      toast.error('Không mở được danh sách từ', { description: (err as Error).message })
+      navigate('/import', { replace: true })
+    })
+  }, [jobIdParam, openCandidates, navigate])
+
   async function startExtraction() {
-    setPhase('extracting')
     try {
       const { job_id } = await api.createJob({
         source_type: source,
@@ -44,24 +70,32 @@ export function ImportPage() {
         band_max: bandMax,
       })
       setJobId(job_id)
+      // Nhận xong là báo ngay: từ đây trở đi người học tự do đi chỗ khác.
+      setPhase('queued')
+      toast.success('Đã nhận bài đọc', {
+        description: 'Đang trích xuất ở nền. Xong sẽ báo ở chuông thông báo.',
+      })
 
-      // Job đi qua 'done' HAI lần (xem docstring ingestion_pipeline.py); lần này là
-      // lúc candidates đã sẵn sàng chờ duyệt.
-      const job = await pollUntil(
-        () => api.job(job_id),
-        (value) => value.status === 'done' || value.status === 'failed',
-      )
-      if (job.status === 'failed') {
-        toast.error('Trích xuất thất bại', { description: job.error_message ?? undefined })
-        setPhase('input')
-        return
+      // Vẫn dò nền cho ai đứng đợi. Hết giờ KHÔNG còn là lỗi: job vẫn chạy, thông báo
+      // vẫn sẽ tới — nên chỉ im lặng dừng dò chứ không đá người dùng về màn hình nhập.
+      try {
+        // Job đi qua 'done' HAI lần (xem docstring ingestion_pipeline.py); lần này là
+        // lúc candidates đã sẵn sàng chờ duyệt.
+        const job = await pollUntil(
+          () => api.job(job_id),
+          (value) => value.status === 'done' || value.status === 'failed',
+        )
+        if (job.status === 'failed') {
+          toast.error('Trích xuất thất bại', { description: job.error_message ?? undefined })
+          setPhase('input')
+          return
+        }
+        await openCandidates(job_id)
+      } catch {
+        /* vẫn đang chạy — chuông thông báo lo tiếp */
       }
-      const list = await api.candidates(job_id)
-      setCandidates(list)
-      setSelected(new Set(list.map((c) => c.lexical_item_id)))
-      setPhase('review')
     } catch (err) {
-      toast.error('Không trích xuất được', { description: (err as Error).message })
+      toast.error('Không gửi được bài đọc', { description: (err as Error).message })
       setPhase('input')
     }
   }
@@ -71,14 +105,21 @@ export function ImportPage() {
     setPhase('enriching')
     try {
       await api.approve(jobId, [...selected])
-      await pollUntil(
-        () => api.job(jobId),
-        (value) =>
-          (value.status === 'done' && value.approved_count > 0) || value.status === 'failed',
-      )
-      setPhase('done')
+      toast.success(`Đã duyệt ${selected.size} mục`, {
+        description: 'Đang sinh nghĩa và ví dụ ở nền. Xong sẽ báo ở chuông thông báo.',
+      })
+      try {
+        await pollUntil(
+          () => api.job(jobId),
+          (value) =>
+            (value.status === 'done' && value.approved_count > 0) || value.status === 'failed',
+        )
+        setPhase('done')
+      } catch {
+        /* vẫn đang chạy — chuông thông báo lo tiếp */
+      }
     } catch (err) {
-      toast.error('Enrichment lỗi', { description: (err as Error).message })
+      toast.error('Không duyệt được', { description: (err as Error).message })
       setPhase('review')
     }
   }
@@ -185,14 +226,44 @@ export function ImportPage() {
         </Card>
       )}
 
-      {(phase === 'extracting' || phase === 'enriching') && (
-        <Card className="items-center gap-3 px-5 py-12 text-center">
-          <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" aria-hidden />
-          <p className="text-sm text-muted-foreground">
-            {phase === 'extracting'
-              ? 'Extraction Agent đang đọc bài… chạy nền, có thể mất vài chục giây.'
-              : 'Đang sinh nghĩa, câu ví dụ theo dạng bài IELTS và mẹo nhớ…'}
+      {(phase === 'queued' || phase === 'enriching') && (
+        <Card className="items-center gap-4 px-5 py-12 text-center">
+          <Check className="mx-auto size-8 text-mint" aria-hidden />
+          <div>
+            <p className="font-heading text-lg font-medium">
+              {phase === 'queued' ? 'Đã nhận bài đọc' : `Đã duyệt ${selected.size} mục`}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {phase === 'queued'
+                ? 'Agent đang đọc bài và chọn từ đáng học.'
+                : 'Đang sinh nghĩa, câu ví dụ theo dạng bài IELTS và mẹo nhớ.'}{' '}
+              Việc này chạy ở nền — <strong className="text-foreground">bạn có thể rời trang</strong>
+              . Xong sẽ có thông báo ở chuông{' '}
+              <Bell className="inline size-3.5 align-[-2px]" aria-hidden /> trên thanh trên
+              cùng, bấm vào là tới thẳng {phase === 'queued' ? 'màn hình duyệt từ' : 'hàng đợi ôn'}.
+            </p>
+          </div>
+          <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            Nếu bạn ở lại, trang sẽ tự chuyển khi xong.
           </p>
+          {phase === 'queued' && (
+            <div className="flex justify-center gap-2">
+              <Button variant="outline" onClick={() => navigate('/review')}>
+                Ôn bài trong lúc chờ
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setPhase('input')
+                  setText('')
+                  setUrl('')
+                }}
+              >
+                Nhập bài khác
+              </Button>
+            </div>
+          )}
         </Card>
       )}
 
@@ -281,6 +352,7 @@ export function ImportPage() {
             <Button
               variant="outline"
               onClick={() => {
+                navigate('/import', { replace: true })
                 setPhase('input')
                 setText('')
                 setUrl('')

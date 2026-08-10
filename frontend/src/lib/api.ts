@@ -3,6 +3,7 @@
 import type {
   AnalyticsOverview,
   AnswerResponse,
+  AppNotification,
   Candidate,
   Cluster,
   ClusterExercise,
@@ -10,6 +11,7 @@ import type {
   ErrorBreakdown,
   IngestionJob,
   Leech,
+  NotificationList,
   ProductionAttempt,
   ReviewErrorType,
   ReviewQueue,
@@ -132,6 +134,13 @@ export const api = {
     post<{ approved_count: number }>(`/api/ingestion/jobs/${id}/approve`, {
       selected_lexical_item_ids: ids,
     }),
+
+  // ---- Thông báo ----
+  notifications: () => request<NotificationList>('/api/notifications'),
+  markNotificationRead: (id: string) =>
+    post<AppNotification>(`/api/notifications/${id}/read`, {}),
+  markAllNotificationsRead: () =>
+    request<void>('/api/notifications/read-all', { method: 'POST' }),
 
   // ---- Review (fast path) ----
   queue: (limit = 30) => request<ReviewQueue>(`/api/review/queue?limit=${limit}`),

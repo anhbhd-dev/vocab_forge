@@ -173,6 +173,24 @@ class ApproveRequest(BaseModel):
     target_ielts_band: float = 7.0
 
 
+# ------------------------------------------------------------- Notifications
+class NotificationOut(BaseModel):
+    model_config = ORM
+    id: str
+    type: str
+    title: str
+    body: str | None = None
+    job_id: str | None = None
+    count: int | None = None
+    read_at: str | None = None
+    created_at: str
+
+
+class NotificationListOut(BaseModel):
+    notifications: list[NotificationOut] = Field(default_factory=list)
+    unread_count: int
+
+
 # ------------------------------------------------------------------- Review
 class ReviewCardOut(BaseModel):
     """Payload một thẻ trong hàng đợi review.

@@ -156,6 +156,28 @@ export interface IngestionJob {
   awaiting_approval: boolean
 }
 
+export type NotificationType =
+  | 'extraction_done'
+  | 'extraction_failed'
+  | 'enrichment_done'
+  | 'enrichment_failed'
+
+export interface AppNotification {
+  id: string
+  type: NotificationType
+  title: string
+  body: string | null
+  job_id: string | null
+  count: number | null
+  read_at: string | null
+  created_at: string
+}
+
+export interface NotificationList {
+  notifications: AppNotification[]
+  unread_count: number
+}
+
 export interface Candidate {
   id: string
   lexical_item_id: string

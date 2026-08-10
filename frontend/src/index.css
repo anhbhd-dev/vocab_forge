@@ -206,6 +206,10 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    /* Lưới an toàn: một phần tử quá rộng lọt vào đâu đó không được phép kéo cả trang
+       trượt ngang trên điện thoại. Chỗ nào cần rộng (bảng, sơ đồ) thì tự cuộn trong
+       hộp của nó, không mượn thanh cuộn của body. */
+    overflow-x: hidden;
   }
 
   h1,
@@ -224,6 +228,16 @@
 
   .font-heading {
     font-family: var(--font-heading);
+  }
+
+  /* Vùng cuộn ngang không hiện thanh cuộn — dùng cho thanh điều hướng trên điện thoại,
+     nơi thanh cuộn chiếm mất chiều cao của một hàng nút vốn đã chật. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 
   /* Giấy kẻ ô mờ — chi tiết "sổ tay", đủ nhạt để không cạnh tranh với chữ.
