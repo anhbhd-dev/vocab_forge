@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, Volume2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useVoice } from '@/lib/voice'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,6 +23,7 @@ const TIMEZONES = ['Asia/Ho_Chi_Minh', 'Asia/Singapore', 'Asia/Tokyo', 'Europe/L
  */
 export function SettingsPage() {
   const { user, refresh } = useAuth()
+  const [voice, setVoice] = useVoice()
   const [min, setMin] = useState(user?.daily_new_min ?? 5)
   const [max, setMax] = useState(user?.daily_new_max ?? 30)
   const [timezone, setTimezone] = useState(user?.timezone ?? 'Asia/Ho_Chi_Minh')
@@ -120,6 +122,38 @@ export function SettingsPage() {
             {user.daily_new_word_goal > max && ' — sẽ được hạ xuống khi bạn lưu.'}
           </p>
         )}
+
+        <Separator />
+
+        <div>
+          <h2 className="font-heading text-lg font-medium">Giọng đọc</h2>
+          <p className="mt-1 mb-3 text-sm text-muted-foreground">
+            Cả hai giọng đều được sinh sẵn nên đổi giọng là nghe được ngay. Thỉnh thoảng
+            đổi giọng là một bài kiểm tra thật: nhận ra từ khi người khác đọc mới là nghe
+            được từ, chứ không phải quen tai một người.
+          </p>
+          <div className="flex gap-2">
+            {(
+              [
+                { value: 'female', label: 'Nữ (af_heart)' },
+                { value: 'male', label: 'Nam (am_michael)' },
+              ] as const
+            ).map((option) => (
+              <Button
+                key={option.value}
+                variant={voice === option.value ? 'default' : 'outline'}
+                onClick={() => setVoice(option.value)}
+                aria-pressed={voice === option.value}
+              >
+                <Volume2 className="size-4" aria-hidden />
+                {option.label}
+              </Button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Lưu ngay trên máy này, không cần bấm "Lưu cài đặt".
+          </p>
+        </div>
 
         <Separator />
 

@@ -96,11 +96,36 @@ class ContextInput(StrictModel):
     surface_form: str
     definition_en: str
     essay_types: list[EssayType]
+    # Câu có thật trong bài đọc của user, nếu có. Gửi kèm để agent dịch và đánh dấu nó
+    # luôn trong cùng một lượt gọi — nếu không thì trên thẻ sẽ có đúng một câu trơ ra
+    # không bản dịch, giữa những câu khác đều có.
+    source_sentence: str | None = None
+
+
+HighlightRole = Literal["target", "collocation", "academic", "linker"]
+
+
+class ContextHighlight(StrictModel):
+    """Một mảnh đáng tô màu trong câu ví dụ.
+
+    `text` là CHUỖI CON nguyên văn của câu chứ không phải chỉ số ký tự: LLM đếm vị trí
+    rất tệ, còn chép lại đúng đoạn chữ thì làm được. FE tự dò vị trí bằng so khớp chuỗi
+    và bỏ qua mảnh nào không tìm thấy.
+    """
+
+    text: str = Field(min_length=1)
+    role: HighlightRole = "academic"
 
 
 class ContextExample(StrictModel):
     sentence: str
+    # Bản dịch có thể vắng: dữ liệu cũ sinh trước khi có trường này, và câu lấy thẳng từ
+    # bài đọc của user thì không đi qua agent nên không bao giờ có bản dịch.
+    sentence_vi: str | None = None
     essay_type: EssayType = "general"
+    highlights: list[ContextHighlight] = Field(default_factory=list)
+
+    _no_cjk_vi = field_validator("sentence_vi")(_reject_cjk)
 
 
 class ContextOutput(StrictModel):

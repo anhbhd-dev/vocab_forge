@@ -5,7 +5,7 @@ File 01 mục 1, phần CARD CORE và MNEMONIC & CLUSTER.
 
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at_column, id_column
@@ -40,6 +40,7 @@ class LexicalItem(Base):
     # Tên file audio phát âm do Kokoro sinh sẵn ở vòng agent (xem services/tts.py).
     # Lưu tên file chứ không lưu URL đầy đủ: đổi domain/prefix không phải migrate dữ liệu.
     audio_path: Mapped[str | None] = mapped_column(String)
+    audio_path_male: Mapped[str | None] = mapped_column(String)
     cefr_level: Mapped[str | None] = mapped_column(String)
     academic_word_list_sublist: Mapped[int | None] = mapped_column(Integer)
     source_deck_id: Mapped[str | None] = mapped_column(String, ForeignKey("decks.id"))
@@ -84,10 +85,20 @@ class ExampleSentence(Base):
         String, ForeignKey("senses.id"), nullable=False
     )
     sentence: Mapped[str] = mapped_column(String, nullable=False)
+    # Bản dịch tiếng Việt do Context Agent sinh cùng lúc với câu. NULL với câu lấy thẳng
+    # từ bài đọc của user (không đi qua agent) và với dữ liệu sinh trước tính năng này.
+    sentence_vi: Mapped[str | None] = mapped_column(String)
+    # [{"text": "...", "role": "target|collocation|academic|linker"}] — các đoạn cần tô
+    # màu. Lưu chuỗi con chứ không lưu offset: câu là bất biến nên chuỗi con luôn dò
+    # lại được, còn offset thì hỏng ngay khi có ai đó sửa một dấu cách.
+    highlights: Mapped[list | None] = mapped_column(JSON)
     essay_type: Mapped[str | None] = mapped_column(String)
     source: Mapped[str | None] = mapped_column(String)
     generated_by_model: Mapped[str | None] = mapped_column(String)
     audio_path: Mapped[str | None] = mapped_column(String)
+    # Giọng nam, sinh song song với giọng nữ ở vòng agent. Hai cột riêng thay vì một
+    # bảng audio: chỉ có hai giọng và cả hai đều sinh sẵn, thêm bảng chỉ tổ phải join.
+    audio_path_male: Mapped[str | None] = mapped_column(String)
 
 
 class Mnemonic(Base):

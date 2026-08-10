@@ -33,7 +33,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.base import AgentSchemaError, LLMError
@@ -41,6 +41,7 @@ from app.agents.context_agent import DEFAULT_ESSAY_TYPES, ContextAgent
 from app.agents.extraction_agent import ExtractionAgent
 from app.agents.mnemonic_agent import MnemonicAgent
 from app.agents.sense_agent import SenseAgent
+from app.core.config import settings
 from app.core.db import AsyncSessionLocal
 from app.core.time import to_iso, utcnow
 from app.models.jobs import IngestionCandidate, IngestionJob
@@ -54,6 +55,10 @@ from app.schemas.agent_io import (
 from app.services.card_factory import create_cards_for_sense
 from app.services.cluster_service import maybe_run_cluster_batch
 from app.services.content_ingestion import IngestionError, resolve_text
+from app.services.lexical_dedup import (
+    existing_surface_forms,
+    get_or_create_lexical_item,
+)
 from app.services.phonetics import to_ipa
 from app.services.tts import synthesize_many
 
@@ -82,7 +87,7 @@ async def run_extraction_job(
             )
             job.raw_text = text
 
-            existing = await _existing_surface_forms(session, job.user_id)
+            existing = await existing_surface_forms(session, job.user_id)
             agent = ExtractionAgent()
             output = await agent.run_filtered(
                 session,
@@ -95,14 +100,16 @@ async def run_extraction_job(
             )
 
             for candidate in output.candidates:
-                item = LexicalItem(
+                # Tái dùng bản ghi có sẵn thay vì tạo mới: cùng một từ do nhiều bài đọc
+                # (hoặc nhiều user) đề xuất phải trỏ về CÙNG một `lexical_items.id`, nếu
+                # không thì nghĩa/ví dụ/audio bị sinh lại từ đầu cho một thứ y hệt.
+                item, _reused = await get_or_create_lexical_item(
+                    session,
                     surface_form=candidate.surface_form,
                     item_type=candidate.item_type,
                     cefr_level=candidate.cefr_level,
-                    source_deck_id=job.deck_id,
+                    deck_id=job.deck_id,
                 )
-                session.add(item)
-                await session.flush()
                 session.add(
                     IngestionCandidate(
                         job_id=job.id,
@@ -185,6 +192,10 @@ async def run_enrichment_job(
                         )
                     job.completed_at = to_iso(utcnow())
                     await session.commit()
+
+            # Job đã 'done' và thẻ đã vào hàng đợi — UI được giải phóng ở ĐÂY. Audio
+            # chạy tiếp phía sau, người học không phải chờ thêm phút nào.
+            await generate_audio_for_items(lexical_item_ids)
         except Exception as exc:  # pragma: no cover
             logger.exception("job %s: enrichment lỗi", job_id)
             await session.rollback()
@@ -210,6 +221,32 @@ async def enrich_lexical_item(
         surface_form = item.surface_form
         item_type = item.item_type
 
+        # Mục từ đã được enrich trước đó (user khác đã học, hoặc chính user này duyệt nó
+        # ở một bài đọc khác): nghĩa và ví dụ dùng lại nguyên vẹn, chỉ cần phát thẻ cho
+        # user này. Gọi lại agent ở đây không những tốn tiền mà còn SAI — sẽ đẻ thêm một
+        # bộ sense trùng cho cùng một mục từ, và người học thấy hai thẻ y hệt nhau.
+        existing_senses = (
+            (
+                await session.execute(
+                    select(Sense.id).where(Sense.lexical_item_id == lexical_item_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if existing_senses:
+            if item.ipa is None:
+                item.ipa = to_ipa(surface_form)
+            for sense_id in existing_senses:
+                await create_cards_for_sense(session, sense_id, user_id)
+            await session.commit()
+            logger.info(
+                "'%s' đã có %d nghĩa sẵn — bỏ qua agent, chỉ tạo thẻ",
+                surface_form,
+                len(existing_senses),
+            )
+            return lexical_item_id
+
         sentence_context = (
             await session.execute(
                 select(IngestionCandidate.sentence_context)
@@ -230,7 +267,16 @@ async def enrich_lexical_item(
 
     # Context Agent ∥ Mnemonic Agent, song song trên TOÀN BỘ sense (file 03 mục 6).
     async def _enrich_one(definition):
-        tasks = [_run_context_agent(surface_form, definition.definition_en)]
+        # Câu gốc chỉ gửi kèm cho sense ĐẦU TIÊN — theo prompt của Sense Agent, đó là
+        # sense khớp ngữ cảnh bài đọc; gắn nó vào các nghĩa khác là gán sai nghĩa.
+        source = (
+            sentence_context
+            if definition is sense_result.output.senses[0]
+            else None
+        )
+        tasks = [
+            _run_context_agent(surface_form, definition.definition_en, source)
+        ]
         if definition.needs_mnemonic:
             tasks.append(_run_mnemonic_agent(surface_form, definition.definition_en))
         return await asyncio.gather(*tasks, return_exceptions=True)
@@ -239,30 +285,20 @@ async def enrich_lexical_item(
         *(_enrich_one(d) for d in sense_result.output.senses)
     )
 
-    # --- Pha 2b: phiên âm + audio phát âm ---
-    # Cả hai đều chạy local, KHÔNG phải LLM: IPA lấy từ từ điển phát âm (CMUdict/espeak),
-    # audio do Kokoro tổng hợp. Đặt ở đây — vòng agent chạy nền — để vòng review sau này
-    # chỉ việc trả về một URL tĩnh, đúng ràng buộc "review không I/O ngoài" (file 00 mục 4).
+    # --- Pha 2b: phiên âm ---
+    # Chạy local từ từ điển phát âm, mất vài mili-giây nên nằm thẳng trong luồng được.
+    #
+    # Audio thì KHÔNG: Kokoro mất ~4-5 giây mỗi câu, một lô 15 mục là ~75 câu → 5-6 phút.
+    # Để nó ở đây thì job không thể chuyển 'done' cho tới khi đọc xong toàn bộ, trong khi
+    # thẻ đã sẵn sàng từ lâu — UI chờ quá hạn rồi bỏ cuộc dù mọi thứ đều thành công.
+    # Audio được sinh ở `generate_audio_for_items`, chạy SAU khi job đã báo xong.
     ipa = to_ipa(surface_form)
-
-    spoken: list[str] = []
-    if sentence_context:
-        spoken.append(sentence_context)
-    for outcomes in enriched:
-        if not isinstance(outcomes[0], Exception):
-            spoken.extend(e.sentence for e in outcomes[0].output.examples)
-    # dict.fromkeys: bỏ trùng nhưng giữ thứ tự, để map lại đúng kết quả bên dưới.
-    unique_spoken = list(dict.fromkeys(spoken))
-
-    item_audio, *sentence_audio = await synthesize_many([surface_form, *unique_spoken])
-    audio_by_sentence = dict(zip(unique_spoken, sentence_audio))
 
     # --- Pha 3: ghi toàn bộ kết quả trong MỘT transaction ngắn ---
     async with AsyncSessionLocal() as session:
         item = await session.get(LexicalItem, lexical_item_id)
         if item is not None:
             item.ipa = ipa
-            item.audio_path = item_audio
 
         for index, (definition, outcomes) in enumerate(
             zip(sense_result.output.senses, enriched)
@@ -277,37 +313,65 @@ async def enrich_lexical_item(
             session.add(sense)
             await session.flush()
 
-            # Câu gốc trong bài đọc là ví dụ CÓ THẬT — quý hơn câu agent sinh ra, lưu
-            # cho sense đầu tiên (sense khớp ngữ cảnh, theo prompt của Sense Agent).
-            if sentence_context and index == 0:
-                session.add(
-                    ExampleSentence(
-                        sense_id=sense.id,
-                        sentence=sentence_context,
-                        essay_type="general",
-                        source="user_reading",
-                        generated_by_model=None,
-                        audio_path=audio_by_sentence.get(sentence_context),
-                    )
-                )
-
             context_result = outcomes[0]
             if isinstance(context_result, Exception):
                 logger.warning(
                     "Context Agent lỗi cho '%s': %s", surface_form, context_result
                 )
+                examples = []
+                model_name = None
             else:
-                for example in context_result.output.examples:
-                    session.add(
-                        ExampleSentence(
-                            sense_id=sense.id,
-                            sentence=example.sentence,
-                            essay_type=example.essay_type,
-                            source="agent_generated",
-                            generated_by_model=context_result.model,
-                            audio_path=audio_by_sentence.get(example.sentence),
+                examples = list(context_result.output.examples)
+                model_name = context_result.model
+
+            # Câu gốc trong bài đọc là ví dụ CÓ THẬT — quý hơn câu agent sinh ra, lưu
+            # cho sense đầu tiên (sense khớp ngữ cảnh, theo prompt của Sense Agent).
+            #
+            # Agent được yêu cầu trả lại chính câu đó (kèm bản dịch + highlight) làm mục
+            # đầu tiên. Nhưng CHỈ chấp nhận khi nó chép ĐÚNG NGUYÊN VĂN: chỉ cần sửa một
+            # chữ là câu hết còn "có thật", mà đó lại là toàn bộ giá trị của nó. Sai một
+            # ly thì vứt bản của agent, giữ câu gốc — mất bản dịch còn hơn mất tính thật.
+            if sentence_context and index == 0:
+                translated = next(
+                    (
+                        e
+                        for e in examples
+                        if " ".join(e.sentence.split())
+                        == " ".join(sentence_context.split())
+                    ),
+                    None,
+                )
+                if translated is not None:
+                    examples.remove(translated)
+                session.add(
+                    ExampleSentence(
+                        sense_id=sense.id,
+                        sentence=sentence_context,
+                        sentence_vi=translated.sentence_vi if translated else None,
+                        highlights=(
+                            [h.model_dump() for h in translated.highlights] or None
                         )
+                        if translated
+                        else None,
+                        essay_type="general",
+                        source="user_reading",
+                        generated_by_model=model_name if translated else None,
                     )
+                )
+
+            for example in examples:
+                session.add(
+                    ExampleSentence(
+                        sense_id=sense.id,
+                        sentence=example.sentence,
+                        sentence_vi=example.sentence_vi,
+                        highlights=[h.model_dump() for h in example.highlights]
+                        or None,
+                        essay_type=example.essay_type,
+                        source="agent_generated",
+                        generated_by_model=model_name,
+                    )
+                )
 
             if len(outcomes) > 1:
                 mnemonic_result = outcomes[1]
@@ -333,6 +397,90 @@ async def enrich_lexical_item(
     return lexical_item_id
 
 
+async def generate_audio_for_items(lexical_item_ids: list[str]) -> None:
+    """Sinh audio phát âm cho các item vừa enrich — chạy SAU khi job đã báo 'done'.
+
+    Tách khỏi `enrich_lexical_item` là chủ ý, không phải để cho gọn: Kokoro mất ~4-5
+    giây mỗi câu, gộp vào luồng chính sẽ kéo một lô 15 mục lên 5-6 phút và UI chờ quá
+    hạn dù thẻ đã tạo xong từ phút đầu. Người học vào ôn được ngay; audio nhỏ giọt đổ
+    về sau, và trong lúc chưa có thì nút loa dùng giọng trình duyệt (PronounceButton).
+
+    Lỗi ở đây tuyệt đối không được lan ra ngoài: thiếu audio là mất tiện nghi, còn ném
+    lỗi lên thì job đang 'done' lại thành 'failed'.
+    """
+    if not lexical_item_ids:
+        return
+
+    try:
+        async with AsyncSessionLocal() as session:
+            items = (
+                (
+                    await session.execute(
+                        select(LexicalItem).where(
+                            LexicalItem.id.in_(lexical_item_ids),
+                            or_(
+                                LexicalItem.audio_path.is_(None),
+                                LexicalItem.audio_path_male.is_(None),
+                            ),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            sense_ids = (
+                (
+                    await session.execute(
+                        select(Sense.id).where(
+                            Sense.lexical_item_id.in_(lexical_item_ids)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            examples = (
+                (
+                    await session.execute(
+                        select(ExampleSentence).where(
+                            ExampleSentence.sense_id.in_(sense_ids),
+                            or_(
+                                ExampleSentence.audio_path.is_(None),
+                                ExampleSentence.audio_path_male.is_(None),
+                            ),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+                if sense_ids
+                else []
+            )
+
+            targets = [(row, row.surface_form) for row in items]
+            targets += [(row, row.sentence) for row in examples]
+            if not targets:
+                return
+
+            # Hai giọng, hai lượt. Chạy tuần tự chứ không gộp vào một gather: Kokoro trên
+            # CPU đã chạy sát ngưỡng ở semaphore 4, bắn gấp đôi chỉ làm mọi câu cùng chậm
+            # đi chứ không xong sớm hơn. Đằng nào đây cũng là việc chạy nền sau khi job
+            # đã báo xong, nên chậm thêm vài phút không ai phải ngồi chờ.
+            logger.info("Sinh audio 2 giọng cho %d mục", len(targets))
+            texts = [text for _, text in targets]
+            for voice, column in (
+                (settings.tts_voice, "audio_path"),
+                (settings.tts_voice_male, "audio_path_male"),
+            ):
+                paths = await synthesize_many(texts, voice=voice)
+                for (row, _), path in zip(targets, paths):
+                    if path and getattr(row, column) is None:
+                        setattr(row, column, path)
+                await session.commit()
+    except Exception:  # pragma: no cover - audio là tính năng phụ trợ
+        logger.exception("Sinh audio lỗi (bỏ qua, thẻ vẫn dùng được)")
+
+
 async def _run_sense_agent(
     surface_form: str,
     item_type: str,
@@ -353,7 +501,9 @@ async def _run_sense_agent(
         return result
 
 
-async def _run_context_agent(surface_form: str, definition_en: str):
+async def _run_context_agent(
+    surface_form: str, definition_en: str, source_sentence: str | None = None
+):
     async with AsyncSessionLocal() as session:
         result = await ContextAgent().run(
             session,
@@ -361,6 +511,7 @@ async def _run_context_agent(surface_form: str, definition_en: str):
                 surface_form=surface_form,
                 definition_en=definition_en,
                 essay_types=DEFAULT_ESSAY_TYPES,  # type: ignore[arg-type]
+                source_sentence=source_sentence,
             ),
         )
         await session.commit()
@@ -392,22 +543,6 @@ def _url_of(job: IngestionJob) -> str | None:
         if candidate.startswith(("http://", "https://")):
             return candidate
     return None
-
-
-async def _existing_surface_forms(session: AsyncSession, user_id: str) -> list[str]:
-    """Các từ user đã có (để Extraction Agent không đề xuất trùng — nguyên tắc #4)."""
-    from app.models.srs import Card
-
-    rows = (
-        await session.execute(
-            select(LexicalItem.surface_form)
-            .join(Sense, Sense.lexical_item_id == LexicalItem.id)
-            .join(Card, Card.sense_id == Sense.id)
-            .where(Card.user_id == user_id)
-            .distinct()
-        )
-    ).scalars()
-    return list(rows)
 
 
 async def _fail_job(session: AsyncSession, job_id: str, message: str) -> None:

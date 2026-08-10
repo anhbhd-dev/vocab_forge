@@ -49,13 +49,27 @@ export interface Deck {
   created_at: string
 }
 
+/** Vai trò của một mảnh được tô màu trong câu ví dụ — xem `HighlightedSentence`. */
+export type HighlightRole = 'target' | 'collocation' | 'academic' | 'linker'
+
+export interface SentenceHighlight {
+  /** Chuỗi con nguyên văn của câu (không phải offset — agent đếm vị trí rất tệ). */
+  text: string
+  role: HighlightRole
+}
+
 export interface Example {
   id: string
   sentence: string
+  /** Bản dịch tiếng Việt; null với câu lấy thẳng từ bài đọc của user. */
+  sentence_vi: string | null
+  highlights: SentenceHighlight[] | null
   essay_type: EssayType | null
   source: 'user_reading' | 'agent_generated' | null
   /** Đường dẫn tương đối tới file audio Kokoro sinh sẵn, vd `/audio/ab12.mp3`. */
   audio_url: string | null
+  /** Cùng câu đó, giọng nam. Sinh song song ở vòng agent. */
+  audio_url_male: string | null
 }
 
 export interface Mnemonic {
@@ -83,6 +97,7 @@ export interface ReviewCard {
   item_type: string
   ipa: string | null
   audio_url: string | null
+  audio_url_male: string | null
   cefr_level: string | null
   definition_en: string
   definition_vi: string | null

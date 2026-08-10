@@ -78,11 +78,23 @@ nào khác, không dùng markdown code block.
 ```json
 {
   "examples": [
-    { "sentence": "...", "essay_type": "opinion" },
-    { "sentence": "...", "essay_type": "problem_solution" }
+    {
+      "sentence": "...",
+      "sentence_vi": "bản dịch tiếng Việt tự nhiên của câu trên",
+      "essay_type": "opinion",
+      "highlights": [
+        { "text": "detrimental effect", "role": "target" },
+        { "text": "have a ... on", "role": "collocation" }
+      ]
+    },
+    { "sentence": "...", "sentence_vi": "...", "essay_type": "problem_solution" }
   ]
 }
 ```
+
+`highlights[].text` phải là chuỗi con XUẤT HIỆN NGUYÊN VĂN trong `sentence` (FE dò vị trí
+bằng cách so khớp chuỗi để tô màu; chuỗi không tìm thấy sẽ bị bỏ qua âm thầm).
+`role` ∈ `target` | `collocation` | `academic` | `linker`.
 
 ### System prompt:
 
@@ -106,6 +118,24 @@ YÊU CẦU BẮT BUỘC:
    cùng một chủ đề cho nhiều ví dụ.
 5. Độ dài câu 15-25 từ, đúng độ phức tạp ngữ pháp của band 7+ (có mệnh đề phụ, không
    quá đơn giản).
+6. sentence_vi: dịch câu đó sang TIẾNG VIỆT tự nhiên, đúng văn phong học thuật. Dịch
+   trọn ý cả câu chứ không dịch từng từ rời rạc. BẮT BUỘC viết bằng tiếng Việt có dấu,
+   TUYỆT ĐỐI KHÔNG dùng chữ Hán, chữ Nhật hay chữ Hàn.
+7. highlights: đánh dấu 2-4 phần đáng chú ý NHẤT trong câu, mỗi phần ghi đúng nguyên
+   văn chuỗi con có trong sentence (sao chép y hệt, kể cả hoa thường):
+   - target: chính từ/cụm đang học, đúng dạng nó xuất hiện trong câu (có thể đã chia
+     thì hoặc thêm -s). LUÔN phải có đúng một mục role này.
+   - collocation: từ đi kèm cố định với target trong câu (động từ, giới từ, danh từ
+     đứng cạnh) — đây là thứ người học hay dùng sai nhất nên phải chỉ ra.
+   - academic: một từ học thuật khác trong câu đáng học thêm (nếu có).
+   - linker: từ nối thể hiện cấu trúc lập luận (however, whereas, consequently...).
+   Không đánh dấu tràn lan: highlight cả câu thì bằng không highlight gì.
+
+8. Nếu input có source_sentence (câu có thật lấy từ bài đọc của người học): trả nó
+   thành PHẦN TỬ ĐẦU TIÊN của examples, với essay_type = "general" và sentence CHÉP
+   NGUYÊN VĂN, không sửa dù chỉ một ký tự, không rút gọn, không sửa lỗi. Giá trị của
+   câu đó nằm ở chỗ nó có thật; sửa đi là mất. Chỉ bổ sung sentence_vi và highlights.
+   Các câu do bạn tự viết xếp sau nó.
 
 Trả về CHỈ một JSON object theo đúng schema, không thêm text nào khác.
 ```

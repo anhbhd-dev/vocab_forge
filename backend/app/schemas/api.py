@@ -77,9 +77,12 @@ class ExampleOut(BaseModel):
     model_config = ORM
     id: str
     sentence: str
+    sentence_vi: str | None = None
+    highlights: list[dict] | None = None
     essay_type: str | None = None
     source: str | None = None
     audio_url: str | None = None
+    audio_url_male: str | None = None
 
 
 class MnemonicOut(BaseModel):
@@ -101,6 +104,7 @@ class LexicalItemOut(BaseModel):
     item_type: str
     ipa: str | None = None
     audio_url: str | None = None
+    audio_url_male: str | None = None
     cefr_level: str | None = None
     academic_word_list_sublist: int | None = None
     created_at: str
@@ -194,6 +198,7 @@ class ReviewCardOut(BaseModel):
     item_type: str
     ipa: str | None = None
     audio_url: str | None = None
+    audio_url_male: str | None = None
     cefr_level: str | None = None
     definition_en: str
     definition_vi: str | None = None

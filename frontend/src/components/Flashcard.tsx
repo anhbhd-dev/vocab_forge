@@ -10,6 +10,7 @@ import {
   formatInterval,
 } from '@/lib/format'
 import { HighlighterSweep, SweepBar } from '@/components/HighlighterSweep'
+import { HighlightedSentence } from '@/components/HighlightedSentence'
 import { ErrorTypeBadge } from '@/components/ErrorTypeBadge'
 import { PronounceButton } from '@/components/PronounceButton'
 import { Badge } from '@/components/ui/badge'
@@ -124,7 +125,12 @@ export function Flashcard({ card, index, total, onAnswer, busy }: Props) {
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         {askForVietnamese && card.ipa && <span className="tnum">/{card.ipa}/</span>}
         {askForVietnamese && (
-          <PronounceButton audioUrl={card.audio_url} text={card.surface_form} size="sm" />
+          <PronounceButton
+            audioUrl={card.audio_url}
+            audioUrlMale={card.audio_url_male}
+            text={card.surface_form}
+            size="sm"
+          />
         )}
         {card.cefr_level && <span>{card.cefr_level}</span>}
         {card.part_of_speech && <span>{card.part_of_speech}</span>}
@@ -175,7 +181,11 @@ export function Flashcard({ card, index, total, onAnswer, busy }: Props) {
                 )}
                 {/* Chiều vi→en: giờ đáp án đã hiện, nghe phát âm mới không bị lộ trước. */}
                 {!askForVietnamese && (
-                  <PronounceButton audioUrl={card.audio_url} text={card.surface_form} />
+                  <PronounceButton
+                    audioUrl={card.audio_url}
+                    audioUrlMale={card.audio_url_male}
+                    text={card.surface_form}
+                  />
                 )}
               </p>
               {!askForVietnamese && card.ipa && (
@@ -206,15 +216,27 @@ export function Flashcard({ card, index, total, onAnswer, busy }: Props) {
                           ? 'bài đọc của bạn'
                           : (ESSAY_TYPE_LABEL[example.essay_type ?? 'general'] ?? 'chung')}
                       </Badge>
-                      {example.sentence}
+                      <HighlightedSentence
+                        sentence={example.sentence}
+                        highlights={example.highlights}
+                        surfaceForm={card.surface_form}
+                      />
                       {/* Nghe cả câu: trọng âm và nối âm của collocation chỉ lộ ra khi
                           nó nằm trong câu, nghe từ rời không thấy được. */}
                       <PronounceButton
                         audioUrl={example.audio_url}
+                        audioUrlMale={example.audio_url_male}
                         text={example.sentence}
                         size="sm"
                         className="ml-1 align-middle"
                       />
+                      {/* Bản dịch nằm DƯỚI và nhạt hơn: mắt phải chạm câu tiếng Anh
+                          trước, dịch chỉ để xác nhận lại chứ không phải để đọc thay. */}
+                      {example.sentence_vi && (
+                        <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                          {example.sentence_vi}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

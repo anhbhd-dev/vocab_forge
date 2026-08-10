@@ -24,6 +24,10 @@ from app.schemas.api import (
     LexicalItemOut,
 )
 from app.services.ingestion_pipeline import run_enrichment_job
+from app.services.lexical_dedup import (
+    get_or_create_lexical_item,
+    user_has_cards_for_item,
+)
 from app.services.tts import audio_url_for
 
 router = APIRouter(tags=["decks"])
@@ -87,12 +91,19 @@ async def create_lexical_item(
     if payload.deck_id:
         await _owned_deck(session, user, payload.deck_id)
 
-    item = LexicalItem(
-        surface_form=payload.surface_form.strip(),
+    # Tái dùng bản ghi có sẵn nếu từ này đã nằm trong DB (xem services/lexical_dedup.py):
+    # nghĩa/ví dụ/audio giống nhau với mọi người học nên không có lý do sinh lại.
+    item, reused = await get_or_create_lexical_item(
+        session,
+        surface_form=payload.surface_form,
         item_type=payload.item_type,
-        source_deck_id=payload.deck_id,
+        deck_id=payload.deck_id,
     )
-    session.add(item)
+    if reused and await user_has_cards_for_item(session, user.id, item.id):
+        raise HTTPException(
+            status_code=409,
+            detail=f"'{item.surface_form}' đã có trong bộ thẻ của bạn rồi",
+        )
     await session.commit()
 
     background.add_task(
@@ -172,6 +183,7 @@ async def get_lexical_item(
         "item_type": item.item_type,
         "ipa": item.ipa,
         "audio_url": audio_url_for(item.audio_path),
+        "audio_url_male": audio_url_for(item.audio_path_male),
         "cefr_level": item.cefr_level,
         "academic_word_list_sublist": item.academic_word_list_sublist,
         "created_at": item.created_at,
@@ -186,9 +198,12 @@ async def get_lexical_item(
                     {
                         "id": e.id,
                         "sentence": e.sentence,
+                        "sentence_vi": e.sentence_vi,
+                        "highlights": e.highlights,
                         "essay_type": e.essay_type,
                         "source": e.source,
                         "audio_url": audio_url_for(e.audio_path),
+                        "audio_url_male": audio_url_for(e.audio_path_male),
                     }
                     for e in examples
                     if e.sense_id == s.id

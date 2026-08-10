@@ -243,6 +243,7 @@ async def hydrate_cards(session: AsyncSession, cards: list[Card]) -> list[dict]:
                 "ipa": item.ipa,
                 # Chỉ ghép chuỗi, không đụng vào đĩa hay mạng — fast path vẫn sạch.
                 "audio_url": audio_url_for(item.audio_path),
+                "audio_url_male": audio_url_for(item.audio_path_male),
                 "cefr_level": item.cefr_level,
                 "definition_en": sense.definition_en,
                 "definition_vi": sense.definition_vi,
@@ -252,9 +253,12 @@ async def hydrate_cards(session: AsyncSession, cards: list[Card]) -> list[dict]:
                     {
                         "id": e.id,
                         "sentence": e.sentence,
+                        "sentence_vi": e.sentence_vi,
+                        "highlights": e.highlights,
                         "essay_type": e.essay_type,
                         "source": e.source,
                         "audio_url": audio_url_for(e.audio_path),
+                        "audio_url_male": audio_url_for(e.audio_path_male),
                     }
                     for e in examples.get(card.sense_id, [])
                 ],

@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     tts_model: str = "kokoro"
     # af_heart: giọng nữ Mỹ, rõ chữ — hợp để nghe mẫu phát âm từ vựng.
     tts_voice: str = "af_heart"
+    # Giọng nam sinh SONG SONG với giọng nữ, không thay thế: nghe một từ bằng hai chất
+    # giọng khác nhau là cách rẻ nhất để tách âm vị ra khỏi đặc trưng của người nói —
+    # người học nhận ra từ đó khi người khác đọc chứ không chỉ khi af_heart đọc.
+    tts_voice_male: str = "am_michael"
     # Chậm hơn realtime một chút: người học cần nghe rõ từng âm, không phải nghe kể chuyện.
     tts_speed: float = 0.9
     tts_timeout_seconds: float = 120.0

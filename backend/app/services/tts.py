@@ -115,12 +115,14 @@ async def synthesize(text: str, voice: str | None = None) -> str | None:
     return name
 
 
-async def synthesize_many(texts: list[str]) -> list[str | None]:
+async def synthesize_many(
+    texts: list[str], voice: str | None = None
+) -> list[str | None]:
     """Tổng hợp nhiều chuỗi song song (đã bị semaphore ghìm lại ở mức an toàn)."""
     if not texts:
         return []
     results = await asyncio.gather(
-        *(synthesize(t) for t in texts), return_exceptions=True
+        *(synthesize(t, voice) for t in texts), return_exceptions=True
     )
     out: list[str | None] = []
     for item in results:
