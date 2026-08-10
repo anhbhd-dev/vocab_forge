@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import {
+  AudioLines,
   BarChart3,
   BookOpen,
   FilePlus2,
@@ -11,6 +12,7 @@ import {
   Sun,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
+import { useVoice } from '@/lib/voice'
 import { Button } from '@/components/ui/button'
 
 const NAV = [
@@ -20,6 +22,34 @@ const NAV = [
   { to: '/analytics', label: 'Phân tích', icon: BarChart3, end: false },
   { to: '/settings', label: 'Cài đặt', icon: Settings, end: false },
 ]
+
+/**
+ * Đổi giọng đọc ngay trên thanh điều hướng.
+ *
+ * Để nút này ở trang Cài đặt là sai chỗ: người học nghe phát âm ở màn hình ôn tập, và
+ * quyết định "muốn nghe giọng khác" nảy ra ĐÚNG lúc vừa nghe xong một từ. Bắt họ rời
+ * màn hình ôn để đi tìm một công tắc thì thực tế là không ai đổi giọng bao giờ.
+ *
+ * Cả hai giọng đều sinh sẵn nên bấm là đổi ngay, không chờ, không gọi TTS.
+ */
+function VoiceToggle() {
+  const [voice, setVoice] = useVoice()
+  const male = voice === 'male'
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setVoice(male ? 'female' : 'male')}
+      aria-label={`Giọng đọc: ${male ? 'nam' : 'nữ'}. Bấm để đổi sang giọng ${male ? 'nữ' : 'nam'}.`}
+      title={`Giọng ${male ? 'nam' : 'nữ'} — bấm để đổi`}
+      className="gap-1.5 px-2 text-muted-foreground"
+    >
+      <AudioLines className="size-4" aria-hidden />
+      <span className="text-xs">{male ? 'Nam' : 'Nữ'}</span>
+    </Button>
+  )
+}
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
@@ -76,6 +106,7 @@ export function AppShell() {
 
           <div className="ml-auto flex items-center gap-1">
             <span className="hidden text-xs text-muted-foreground md:inline">{user?.email}</span>
+            <VoiceToggle />
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={logout} aria-label="Đăng xuất">
               <LogOut className="size-4" aria-hidden />

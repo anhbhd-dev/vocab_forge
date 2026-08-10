@@ -76,7 +76,12 @@ export function PronounceButton({
       // Cố gắng tôn trọng lựa chọn giọng cả ở đường dự phòng. Chỉ đoán theo tên giọng
       // của hệ điều hành vì Web Speech API không hề khai báo giới tính — đoán trượt thì
       // rơi về giọng mặc định, không đáng để làm gì phức tạp hơn.
-      const wanted = voice === 'male' ? /male|david|george|mark|guy|alex/i : /female|zira|samantha|aria|jenny|susan/i
+      // `\bmale\b` chứ không phải `male`: "female" có chứa "male" nên mẫu lỏng sẽ chọn
+      // đúng giọng nữ khi người học đang xin giọng nam.
+      const wanted =
+        voice === 'male'
+          ? /\bmale\b|david|george|mark|guy|alex|ryan|james/i
+          : /female|zira|samantha|aria|jenny|susan|karen/i
       const match = window.speechSynthesis
         .getVoices()
         .find((v) => v.lang.startsWith('en') && wanted.test(v.name))
