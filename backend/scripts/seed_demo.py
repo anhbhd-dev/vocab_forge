@@ -281,6 +281,66 @@ async def main() -> None:
                 await session.execute(
                     delete(IngestionJob).where(IngestionJob.id.in_(job_ids))
                 )
+
+            # Nội dung từ vựng phải xoá TRƯỚC deck: `lexical_items.source_deck_id`
+            # tham chiếu `decks(id)`, và PostgreSQL thực thi khoá ngoại nghiêm ngặt
+            # (SQLite mặc định tắt nên lỗi này chỉ lộ ra trên Postgres).
+            deck_ids = list(
+                (
+                    await session.execute(
+                        select(Deck.id).where(Deck.user_id == old.id)
+                    )
+                ).scalars()
+            )
+            if deck_ids:
+                item_ids = list(
+                    (
+                        await session.execute(
+                            select(LexicalItem.id).where(
+                                LexicalItem.source_deck_id.in_(deck_ids)
+                            )
+                        )
+                    ).scalars()
+                )
+                if item_ids:
+                    sense_ids = list(
+                        (
+                            await session.execute(
+                                select(Sense.id).where(
+                                    Sense.lexical_item_id.in_(item_ids)
+                                )
+                            )
+                        ).scalars()
+                    )
+                    if sense_ids:
+                        await session.execute(
+                            delete(ExampleSentence).where(
+                                ExampleSentence.sense_id.in_(sense_ids)
+                            )
+                        )
+                        await session.execute(
+                            delete(Mnemonic).where(Mnemonic.sense_id.in_(sense_ids))
+                        )
+                        await session.execute(
+                            delete(ConfusionClusterMember).where(
+                                ConfusionClusterMember.sense_id.in_(sense_ids)
+                            )
+                        )
+                        await session.execute(
+                            delete(Card).where(Card.sense_id.in_(sense_ids))
+                        )
+                        await session.execute(
+                            delete(Sense).where(Sense.id.in_(sense_ids))
+                        )
+                    await session.execute(
+                        delete(IngestionCandidate).where(
+                            IngestionCandidate.lexical_item_id.in_(item_ids)
+                        )
+                    )
+                    await session.execute(
+                        delete(LexicalItem).where(LexicalItem.id.in_(item_ids))
+                    )
+
             await session.execute(delete(Deck).where(Deck.user_id == old.id))
             await session.delete(old)
             await session.commit()
@@ -366,6 +426,10 @@ async def main() -> None:
                     reps, lapses = 6 + position, 1 if position == 1 else 0
                     last = now - timedelta(days=2 + position)
                     due = now + timedelta(days=stability * 0.6)
+                    # Cho 2 thẻ production đầu tiên đến hạn ngay để buổi ôn demo đi
+                    # qua đủ cả 4 loại thẻ (nhận diện, viết câu, phân biệt cận nghĩa).
+                    if direction == "production" and position < 2:
+                        due = now - timedelta(minutes=10)
                 elif position < 7:
                     state, stability, difficulty = "learning", 1.4 + position * 0.3, 6.2
                     reps, lapses = 2, 0
