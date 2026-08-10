@@ -40,23 +40,6 @@ VF_BUILD_TARGET=base VF_FE_BUILD_TARGET=prod docker compose up -d --build
 
 Cổng bị trùng thì đổi `VF_DB_PORT` / `VF_API_PORT` / `VF_WEB_PORT` trong `.env`.
 
-## Test
-
-```bash
-# Trên SQLite tạm, nhanh, không cần Docker
-cd backend && pytest
-
-# Trên đúng PostgreSQL sẽ chạy production
-docker compose exec -e TEST_DATABASE_URL=postgresql+asyncpg://vocabforge:vocabforge@db:5432/vocabforge_test \
-  backend pytest
-```
-
-88 test, không có test nào gọi mạng (dùng `MockProvider`). Cần tạo DB test một lần:
-
-```bash
-docker compose exec db psql -U vocabforge -d vocabforge -c "CREATE DATABASE vocabforge_test;"
-```
-
 ## Kiến trúc: hai vòng lặp tách rời
 
 Đây là quyết định thiết kế quan trọng nhất (file 00 mục 4):
@@ -69,8 +52,10 @@ docker compose exec db psql -U vocabforge -d vocabforge -c "CREATE DATABASE voca
 
 Ngoại lệ duy nhất là **production grading**: bắt buộc gọi LLM lúc người dùng đang thao
 tác, nên xử lý bằng cách trả `attempt_id` ngay rồi chấm nền — người học đi tiếp thẻ sau
-mà không phải chờ. Ràng buộc "review không gọi LLM" được canh bằng test
-(`test_review_endpoint_never_calls_llm`).
+mà không phải chờ.
+
+Audio phát âm cũng theo đúng nguyên tắc này: Kokoro tổng hợp sẵn ở vòng agent, vòng
+review chỉ trả về URL của file tĩnh.
 
 ## Điểm khác biệt so với Anki
 

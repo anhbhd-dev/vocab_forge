@@ -8,7 +8,7 @@ Triển khai theo spec trong `../docs/` (files 00–04).
 ```bash
 cd backend
 uv venv --python 3.12 ../.venv          # hoặc python -m venv
-uv pip install -e ".[dev]"              # hoặc pip install -e ".[dev]"
+uv pip install -e .                     # hoặc pip install -e .
 
 cp .env.example .env
 # điền DEEPSEEK_API_KEY vào .env
@@ -18,9 +18,8 @@ uvicorn app.main:app --reload
 
 Mở http://127.0.0.1:8000/docs để xem toàn bộ endpoint.
 
-```bash
-pytest                                   # 88 test, không gọi mạng (dùng MockProvider)
-```
+Phiên âm cần `espeak-ng` ở tầng hệ điều hành (Docker đã cài sẵn); thiếu nó thì chỉ còn
+tầng CMUdict, cụm từ lạ sẽ không có phiên âm.
 
 ## Nguyên tắc kiến trúc quan trọng nhất
 
@@ -36,7 +35,8 @@ Ngoại lệ duy nhất là **Production Grading** (`/api/production/attempts`):
 LLM trong lúc user tương tác, nên xử lý bằng cách trả `attempt_id` ngay
 (`status=pending`) rồi chấm nền — user đi tiếp thẻ sau, poll kết quả sau.
 
-Có một test canh giữ ràng buộc này: `test_review_endpoint_never_calls_llm`.
+Cùng nguyên tắc, TTS (Kokoro) chạy ở vòng agent: audio được tổng hợp sẵn lúc enrich rồi
+phục vụ tĩnh qua `/audio/*`, review không hề gọi TTS.
 
 ## Cấu trúc
 
@@ -60,7 +60,8 @@ app/
 ├── api/           auth, decks, ingestion, review, production, clusters, analytics
 └── services/      content_ingestion, ingestion_pipeline, cluster_service,
                    review_service, production_service, leech_service,
-                   analytics_service, card_factory, similarity
+                   analytics_service, card_factory, similarity,
+                   phonetics (IPA offline), tts (Kokoro + cache)
 ```
 
 ## Những chỗ lệch khỏi spec (và lý do)
@@ -87,8 +88,7 @@ Agent (Agent 4) đều **nhận `definition_en` làm input**. Thiếu đúng m�
 
 Sense Agent lấp bước đó, đồng thời trả `needs_mnemonic` — chính là "heuristic từ khó
 hình dung" mà file 03 mục 6 nói tới, dùng để chỉ chạy Mnemonic Agent khi cần (tiết kiệm
-chi phí). 5 prompt gốc **không bị sửa một ký tự nào** (có test kiểm chứng:
-`test_prompts_match_spec_file_verbatim`).
+chi phí). 5 prompt gốc **không bị sửa một ký tự nào**.
 
 ### 3. Bảng `ingestion_candidates`
 

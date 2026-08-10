@@ -11,6 +11,7 @@ import {
 } from '@/lib/format'
 import { HighlighterSweep, SweepBar } from '@/components/HighlighterSweep'
 import { ErrorTypeBadge } from '@/components/ErrorTypeBadge'
+import { PronounceButton } from '@/components/PronounceButton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -117,8 +118,14 @@ export function Flashcard({ card, index, total, onAnswer, busy }: Props) {
         )}
       </h2>
 
+      {/* Dòng tra cứu kiểu từ điển: /phiên âm/ + loa, rồi mới tới nhãn phân loại.
+          Chiều vi→en KHÔNG hiện phiên âm lẫn nút phát âm ở mặt trước — nghe được chính
+          là đọc trước đáp án. */}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-        {askForVietnamese && card.ipa && <span className="tnum">{card.ipa}</span>}
+        {askForVietnamese && card.ipa && <span className="tnum">/{card.ipa}/</span>}
+        {askForVietnamese && (
+          <PronounceButton audioUrl={card.audio_url} text={card.surface_form} size="sm" />
+        )}
         {card.cefr_level && <span>{card.cefr_level}</span>}
         {card.part_of_speech && <span>{card.part_of_speech}</span>}
         {card.register && <span>{card.register}</span>}
@@ -160,13 +167,20 @@ export function Flashcard({ card, index, total, onAnswer, busy }: Props) {
 
             {/* --- Mặt sau --- */}
             <div>
-              <p className="font-heading text-2xl font-medium">
+              <p className="font-heading flex items-center gap-2 text-2xl font-medium">
                 {!askForVietnamese ? (
                   <HighlighterSweep stability={card.stability}>{back}</HighlighterSweep>
                 ) : (
                   back
                 )}
+                {/* Chiều vi→en: giờ đáp án đã hiện, nghe phát âm mới không bị lộ trước. */}
+                {!askForVietnamese && (
+                  <PronounceButton audioUrl={card.audio_url} text={card.surface_form} />
+                )}
               </p>
+              {!askForVietnamese && card.ipa && (
+                <p className="tnum mt-1 text-sm text-muted-foreground">/{card.ipa}/</p>
+              )}
               {askForVietnamese && card.definition_vi && (
                 <p className="mt-2 text-muted-foreground">{card.definition_en}</p>
               )}
@@ -193,6 +207,14 @@ export function Flashcard({ card, index, total, onAnswer, busy }: Props) {
                           : (ESSAY_TYPE_LABEL[example.essay_type ?? 'general'] ?? 'chung')}
                       </Badge>
                       {example.sentence}
+                      {/* Nghe cả câu: trọng âm và nối âm của collocation chỉ lộ ra khi
+                          nó nằm trong câu, nghe từ rời không thấy được. */}
+                      <PronounceButton
+                        audioUrl={example.audio_url}
+                        text={example.sentence}
+                        size="sm"
+                        className="ml-1 align-middle"
+                      />
                     </li>
                   ))}
                 </ul>

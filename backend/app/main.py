@@ -8,11 +8,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.agents.base import AgentSchemaError, LLMError
 from app.api import analytics, auth, clusters, decks, ingestion, production, review
 from app.core.config import settings
 from app.core.db import init_db, ping
+from app.services.phonetics import phonetics_backend
+from app.services.tts import audio_dir, tts_health
 from app.srs.engine import FSRS_SUPPORTS_FRACTIONAL_INTERVAL, FSRS_VARIANT
 
 logging.basicConfig(
@@ -74,6 +77,10 @@ app.add_middleware(
 for module in (auth, decks, ingestion, review, production, clusters, analytics):
     app.include_router(module.router)
 
+# Audio phát âm phục vụ TĨNH, không đi qua route Python nào: vòng review chỉ nhận một
+# URL và trình duyệt tự tải: không thêm một nhịp I/O nào vào fast path.
+app.mount("/audio", StaticFiles(directory=str(audio_dir())), name="audio")
+
 
 @app.exception_handler(LLMError)
 async def _llm_error_handler(_request, exc: LLMError):
@@ -99,4 +106,8 @@ async def health() -> dict:
         "srs_engine": FSRS_VARIANT,
         "fractional_interval": FSRS_SUPPORTS_FRACTIONAL_INTERVAL,
         "llm_provider": settings.llm_provider,
+        # TTS/phonetics hỏng KHÔNG hạ status: thiếu audio thì app vẫn học được bình
+        # thường, không đáng để container bị restart.
+        "tts": await tts_health(),
+        "phonetics": phonetics_backend(),
     }

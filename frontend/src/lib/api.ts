@@ -20,6 +20,17 @@ import type {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 const TOKEN_KEY = 'vf-token'
 
+/**
+ * Đường dẫn tương đối từ API (vd `/audio/ab12.mp3`) → URL tuyệt đối tải được.
+ *
+ * Backend trả về đường dẫn tương đối chứ không phải URL đầy đủ để đổi domain không
+ * phải migrate dữ liệu trong DB — phần ghép host nằm ở đây.
+ */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null
+  return `${BASE_URL}${path}`
+}
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }

@@ -37,6 +37,9 @@ class LexicalItem(Base):
     surface_form: Mapped[str] = mapped_column(String, nullable=False)
     item_type: Mapped[str] = mapped_column(String, nullable=False)
     ipa: Mapped[str | None] = mapped_column(String)
+    # Tên file audio phát âm do Kokoro sinh sẵn ở vòng agent (xem services/tts.py).
+    # Lưu tên file chứ không lưu URL đầy đủ: đổi domain/prefix không phải migrate dữ liệu.
+    audio_path: Mapped[str | None] = mapped_column(String)
     cefr_level: Mapped[str | None] = mapped_column(String)
     academic_word_list_sublist: Mapped[int | None] = mapped_column(Integer)
     source_deck_id: Mapped[str | None] = mapped_column(String, ForeignKey("decks.id"))
@@ -84,6 +87,7 @@ class ExampleSentence(Base):
     essay_type: Mapped[str | None] = mapped_column(String)
     source: Mapped[str | None] = mapped_column(String)
     generated_by_model: Mapped[str | None] = mapped_column(String)
+    audio_path: Mapped[str | None] = mapped_column(String)
 
 
 class Mnemonic(Base):

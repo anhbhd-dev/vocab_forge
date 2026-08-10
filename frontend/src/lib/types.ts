@@ -51,6 +51,8 @@ export interface Example {
   sentence: string
   essay_type: EssayType | null
   source: 'user_reading' | 'agent_generated' | null
+  /** Đường dẫn tương đối tới file audio Kokoro sinh sẵn, vd `/audio/ab12.mp3`. */
+  audio_url: string | null
 }
 
 export interface Mnemonic {
@@ -77,6 +79,7 @@ export interface ReviewCard {
   surface_form: string
   item_type: string
   ipa: string | null
+  audio_url: string | null
   cefr_level: string | null
   definition_en: string
   definition_vi: string | null

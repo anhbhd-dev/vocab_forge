@@ -75,6 +75,7 @@ class ExampleOut(BaseModel):
     sentence: str
     essay_type: str | None = None
     source: str | None = None
+    audio_url: str | None = None
 
 
 class MnemonicOut(BaseModel):
@@ -95,6 +96,7 @@ class LexicalItemOut(BaseModel):
     surface_form: str
     item_type: str
     ipa: str | None = None
+    audio_url: str | None = None
     cefr_level: str | None = None
     academic_word_list_sublist: int | None = None
     created_at: str
@@ -177,6 +179,7 @@ class ReviewCardOut(BaseModel):
     surface_form: str
     item_type: str
     ipa: str | None = None
+    audio_url: str | None = None
     cefr_level: str | None = None
     definition_en: str
     definition_vi: str | None = None

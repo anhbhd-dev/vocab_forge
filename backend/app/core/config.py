@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_model: str = "gemini-2.0-flash"
 
+    # Text-to-speech (Kokoro-82M chạy local, API tương thích OpenAI).
+    # Audio sinh SẴN ở vòng agent rồi phục vụ tĩnh — vòng review không gọi TTS.
+    tts_enabled: bool = True
+    tts_base_url: str = "http://tts:8880/v1"
+    tts_model: str = "kokoro"
+    # af_heart: giọng nữ Mỹ, rõ chữ — hợp để nghe mẫu phát âm từ vựng.
+    tts_voice: str = "af_heart"
+    # Chậm hơn realtime một chút: người học cần nghe rõ từng âm, không phải nghe kể chuyện.
+    tts_speed: float = 0.9
+    tts_timeout_seconds: float = 120.0
+    audio_dir: str = "/app/audio"
+
     # SRS
     fsrs_desired_retention: float = 0.9
     fsrs_maximum_interval: int = 36500

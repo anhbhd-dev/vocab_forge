@@ -54,6 +54,8 @@ from app.schemas.agent_io import (
 from app.services.card_factory import create_cards_for_sense
 from app.services.cluster_service import maybe_run_cluster_batch
 from app.services.content_ingestion import IngestionError, resolve_text
+from app.services.phonetics import to_ipa
+from app.services.tts import synthesize_many
 
 logger = logging.getLogger(__name__)
 
@@ -234,8 +236,31 @@ async def enrich_lexical_item(
         *(_enrich_one(d) for d in sense_result.output.senses)
     )
 
+    # --- Pha 2b: phiên âm + audio phát âm ---
+    # Cả hai đều chạy local, KHÔNG phải LLM: IPA lấy từ từ điển phát âm (CMUdict/espeak),
+    # audio do Kokoro tổng hợp. Đặt ở đây — vòng agent chạy nền — để vòng review sau này
+    # chỉ việc trả về một URL tĩnh, đúng ràng buộc "review không I/O ngoài" (file 00 mục 4).
+    ipa = to_ipa(surface_form)
+
+    spoken: list[str] = []
+    if sentence_context:
+        spoken.append(sentence_context)
+    for outcomes in enriched:
+        if not isinstance(outcomes[0], Exception):
+            spoken.extend(e.sentence for e in outcomes[0].output.examples)
+    # dict.fromkeys: bỏ trùng nhưng giữ thứ tự, để map lại đúng kết quả bên dưới.
+    unique_spoken = list(dict.fromkeys(spoken))
+
+    item_audio, *sentence_audio = await synthesize_many([surface_form, *unique_spoken])
+    audio_by_sentence = dict(zip(unique_spoken, sentence_audio))
+
     # --- Pha 3: ghi toàn bộ kết quả trong MỘT transaction ngắn ---
     async with AsyncSessionLocal() as session:
+        item = await session.get(LexicalItem, lexical_item_id)
+        if item is not None:
+            item.ipa = ipa
+            item.audio_path = item_audio
+
         for index, (definition, outcomes) in enumerate(
             zip(sense_result.output.senses, enriched)
         ):
@@ -259,6 +284,7 @@ async def enrich_lexical_item(
                         essay_type="general",
                         source="user_reading",
                         generated_by_model=None,
+                        audio_path=audio_by_sentence.get(sentence_context),
                     )
                 )
 
@@ -276,6 +302,7 @@ async def enrich_lexical_item(
                             essay_type=example.essay_type,
                             source="agent_generated",
                             generated_by_model=context_result.model,
+                            audio_path=audio_by_sentence.get(example.sentence),
                         )
                     )
 

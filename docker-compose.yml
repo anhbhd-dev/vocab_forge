@@ -42,23 +42,46 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
 
+      # TTS: Kokoro chạy trong mạng compose, backend gọi qua tên service.
+      TTS_ENABLED: ${TTS_ENABLED:-true}
+      TTS_BASE_URL: ${TTS_BASE_URL:-http://tts:8880/v1}
+      TTS_VOICE: ${TTS_VOICE:-af_heart}
+      TTS_SPEED: ${TTS_SPEED:-0.9}
+      AUDIO_DIR: /app/audio
+
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
     ports:
       - "${VF_API_PORT:-8000}:8000"
     volumes:
+      # Audio phát âm đã tổng hợp — giữ qua các lần rebuild để khỏi sinh lại từ đầu.
+      - audio:/app/audio
       # Mount code để --reload hoạt động ở chế độ dev. Ở prod (VF_BUILD_TARGET=base)
       # bỏ dòng này đi thì container chạy hoàn toàn bằng code đã build vào image.
       - ./backend/app:/app/app
-      - ./backend/tests:/app/tests
       - ./backend/scripts:/app/scripts
-      # Spec dùng làm nguồn chuẩn cho test đối chiếu system prompt (test_agents.py).
-      - ./docs:/docs:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys,json; d=json.load(urllib.request.urlopen('http://localhost:8000/health')); sys.exit(0 if d['status']=='ok' else 1)\""]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  tts:
+    # Kokoro-82M (Apache-2.0) sau một API tương thích OpenAI. Bản CPU: không cần GPU,
+    # tốc độ xấp xỉ realtime — thừa đủ vì audio chỉ sinh MỘT lần rồi cache vĩnh viễn.
+    # Có GPU NVIDIA thì đổi sang :v0.2.2 (bản gpu) và khai báo deploy.resources.
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.2
+    restart: unless-stopped
+    ports:
+      # Mở ra host để thử nhanh bằng curl; app không cần cổng này.
+      - "${VF_TTS_PORT:-8880}:8880"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8880/v1/models').status==200 else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      # Lần chạy đầu phải tải model (~350MB) nên cho thời gian khởi động rộng rãi.
+      start_period: 180s
 
   frontend:
     build:
@@ -89,3 +112,4 @@ services:
 
 volumes:
   pgdata:
+  audio:

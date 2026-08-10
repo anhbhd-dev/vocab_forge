@@ -24,6 +24,7 @@ from app.schemas.api import (
     LexicalItemOut,
 )
 from app.services.ingestion_pipeline import run_enrichment_job
+from app.services.tts import audio_url_for
 
 router = APIRouter(tags=["decks"])
 
@@ -170,6 +171,7 @@ async def get_lexical_item(
         "surface_form": item.surface_form,
         "item_type": item.item_type,
         "ipa": item.ipa,
+        "audio_url": audio_url_for(item.audio_path),
         "cefr_level": item.cefr_level,
         "academic_word_list_sublist": item.academic_word_list_sublist,
         "created_at": item.created_at,
@@ -186,6 +188,7 @@ async def get_lexical_item(
                         "sentence": e.sentence,
                         "essay_type": e.essay_type,
                         "source": e.source,
+                        "audio_url": audio_url_for(e.audio_path),
                     }
                     for e in examples
                     if e.sense_id == s.id

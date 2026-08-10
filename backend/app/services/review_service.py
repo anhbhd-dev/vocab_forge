@@ -23,6 +23,7 @@ from app.models.lexical import (
 )
 from app.models.srs import Card, ReviewLog
 from app.models.user import User
+from app.services.tts import audio_url_for
 from app.srs.engine import CardState, get_engine, next_interval_preview
 
 # Retention chỉ tính trên các lần review THỰC SỰ kiểm tra trí nhớ: thẻ đã được hẹn
@@ -240,6 +241,8 @@ async def hydrate_cards(session: AsyncSession, cards: list[Card]) -> list[dict]:
                 "surface_form": item.surface_form,
                 "item_type": item.item_type,
                 "ipa": item.ipa,
+                # Chỉ ghép chuỗi, không đụng vào đĩa hay mạng — fast path vẫn sạch.
+                "audio_url": audio_url_for(item.audio_path),
                 "cefr_level": item.cefr_level,
                 "definition_en": sense.definition_en,
                 "definition_vi": sense.definition_vi,
@@ -251,6 +254,7 @@ async def hydrate_cards(session: AsyncSession, cards: list[Card]) -> list[dict]:
                         "sentence": e.sentence,
                         "essay_type": e.essay_type,
                         "source": e.source,
+                        "audio_url": audio_url_for(e.audio_path),
                     }
                     for e in examples.get(card.sense_id, [])
                 ],
