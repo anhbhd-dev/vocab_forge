@@ -78,12 +78,28 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    # Chỉ ở dev: mở thêm cho máy khác trong mạng nội bộ (điện thoại cùng Wi-Fi).
-    allow_origin_regex=settings.cors_lan_origin_regex if settings.debug else None,
+    # Ở dev: mở thêm cho máy khác trong mạng nội bộ (điện thoại cùng Wi-Fi).
+    # Ở production: chỉ regex do người deploy khai (preview domain sinh tự động), rỗng
+    # thì None — không có cửa sau nào ngoài cors_origins.
+    allow_origin_regex=(
+        settings.cors_lan_origin_regex
+        if settings.debug
+        else (settings.cors_origin_regex or None)
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# FE và BE deploy tách nhau nên CORS sai là nguyên nhân số một của "app trắng, không
+# login được". Log nguyên trạng cấu hình lúc boot để đối chiếu với origin thật.
+if not settings.debug and not settings.cors_origins and not settings.cors_origin_regex:
+    logger.warning(
+        "CORS_ORIGINS đang rỗng — mọi request từ frontend khác domain sẽ bị trình duyệt "
+        "chặn. Đặt CORS_ORIGINS = origin của frontend (vd https://vocab-forge.xxx.workers.dev)."
+    )
+else:
+    logger.info("CORS origins: %s (regex: %s)", settings.cors_origins, settings.cors_origin_regex or "-")
 
 for module in (
     auth,

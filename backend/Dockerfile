@@ -29,7 +29,10 @@ RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Dạng shell (không phải exec) để ${PORT} được khai triển: Cloud Run, Railway, Render,
+# Fly... tự cấp cổng qua biến PORT và giết container nếu nó nghe cổng khác. Mặc định
+# 8000 giữ nguyên hành vi cũ khi chạy bằng docker-compose.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
 
 
 # --- Stage dev: auto-reload ---

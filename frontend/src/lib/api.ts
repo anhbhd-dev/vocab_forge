@@ -22,13 +22,54 @@ import type {
 /**
  * Gốc của API.
  *
- * Không đặt cứng `localhost`: khi mở app từ điện thoại trong cùng Wi-Fi, `localhost` là
- * chính cái điện thoại chứ không phải máy chạy server. Mặc định vì thế là "cùng host với
- * trang đang mở, cổng 8000" — mở bằng IP LAN nào thì API tự trỏ đúng IP đó, không phải
- * sửa cấu hình mỗi lần router đổi IP. Khi deploy thật, đặt VITE_API_BASE_URL để ghi đè.
+ * Ở DEV, mặc định là "cùng host với trang đang mở, cổng 8000": không đặt cứng
+ * `localhost` vì khi mở app từ điện thoại trong cùng Wi-Fi, `localhost` là chính cái
+ * điện thoại chứ không phải máy chạy server — mở bằng IP LAN nào thì API tự trỏ đúng
+ * IP đó, không phải sửa cấu hình mỗi lần router đổi IP.
+ *
+ * Ở bản build PRODUCTION, chính mặc định đó lại là một cái bẫy: FE deploy tại
+ * `https://app.example.com` sẽ gọi `https://app.example.com:8000` — một cổng không ai
+ * lắng nghe (và trình duyệt cũng chặn cổng lạ trên HTTPS). Nên khi build production mà
+ * thiếu cấu hình, ta báo lỗi thẳng thay vì để mọi request treo rồi "Failed to fetch".
+ *
+ * Lưu ý deploy: VITE_* được nhúng vào bundle lúc BUILD, KHÔNG đọc được lúc chạy. Trên
+ * Cloudflare/Vercel/Netlify phải đặt VITE_API_BASE_URL ở phần biến môi trường của
+ * *build*; đặt ở runtime không có tác dụng và phải build lại mỗi khi đổi URL backend.
  */
-const BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`
+function resolveBaseUrl(): { baseUrl: string; configError: string | null } {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim()
+  // Origin phải khớp chính xác chuỗi backend khai trong CORS; "/" thừa ở cuối làm mọi
+  // path thành "//api/..." nên cắt sạch ngay tại đây.
+  if (configured) return { baseUrl: configured.replace(/\/+$/, ''), configError: null }
+
+  if (import.meta.env.DEV) {
+    return {
+      baseUrl: `${window.location.protocol}//${window.location.hostname}:8000`,
+      configError: null,
+    }
+  }
+
+  return {
+    baseUrl: '',
+    configError:
+      'Bản build này chưa có VITE_API_BASE_URL nên frontend không biết backend nằm ở đâu. ' +
+      'Đặt biến môi trường VITE_API_BASE_URL = URL https của backend ở bước BUILD rồi deploy lại.',
+  }
+}
+
+const { baseUrl: BASE_URL, configError: CONFIG_ERROR } = resolveBaseUrl()
+
+if (CONFIG_ERROR) {
+  // Log ngay lúc nạp module: người deploy nhìn console là thấy nguyên nhân, không phải
+  // đoán qua một đống request đỏ trong tab Network.
+  console.error(`[VocabForge] ${CONFIG_ERROR}`)
+}
+
+/** URL gốc của backend đang dùng (rỗng nếu bản build thiếu cấu hình). */
+export const apiBaseUrl = BASE_URL
+/** Mô tả lỗi cấu hình build, hoặc null nếu ổn — UI có thể hiển thị trực tiếp. */
+export const apiConfigError = CONFIG_ERROR
+
 const TOKEN_KEY = 'vf-token'
 
 /**
@@ -38,7 +79,7 @@ const TOKEN_KEY = 'vf-token'
  * phải migrate dữ liệu trong DB — phần ghép host nằm ở đây.
  */
 export function mediaUrl(path: string | null | undefined): string | null {
-  if (!path) return null
+  if (!path || CONFIG_ERROR) return null
   return `${BASE_URL}${path}`
 }
 
@@ -61,6 +102,10 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // Thiếu cấu hình thì hỏng ở MỌI request — báo đúng nguyên nhân một lần, thay vì để
+  // người dùng đọc "Failed to fetch" và tưởng backend chết.
+  if (CONFIG_ERROR) throw new ApiError(0, CONFIG_ERROR)
+
   const token = getToken()
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,

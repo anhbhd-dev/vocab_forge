@@ -1,0 +1,24 @@
+/**
+ * Cấu hình deploy frontend lên Cloudflare Workers (static assets).
+ *
+ * Chỉ phục vụ file tĩnh trong ./dist — không có Worker script, nên không có runtime nào
+ * đọc được biến môi trường: URL backend phải đi vào bundle từ lúc build
+ * (xem frontend/.env.example). Vì vậy ở đây KHÔNG khai [vars] cho VITE_API_BASE_URL —
+ * khai vào cũng vô tác dụng, chỉ gây hiểu nhầm.
+ *
+ * Deploy:  npm run build && npx wrangler deploy
+ * Nếu đang deploy bằng Cloudflare dashboard (Workers Builds nối với Git): đặt build
+ * command = `npm run build`, output directory = `dist`, và thêm VITE_API_BASE_URL vào
+ * phần "Build variables" (KHÔNG phải "Runtime variables").
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vocab-forge",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist",
+    // SPA: mọi route không khớp file tĩnh (vd /login, /review) trả index.html cho
+    // react-router xử lý. Thiếu dòng này thì F5 giữa chừng là 404.
+    "not_found_handling": "single-page-application"
+  }
+}

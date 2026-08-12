@@ -1,12 +1,23 @@
 """Cấu hình tập trung (pydantic-settings), đọc từ biến môi trường / file .env."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 ProviderName = Literal["deepseek", "gemini", "mock"]
+
+# Những giá trị JWT_SECRET đã nằm sẵn trong repo/tài liệu: ai đọc source cũng ký được
+# token giả cho bất kỳ user nào. Chặn thẳng khi chạy production.
+_PUBLIC_JWT_SECRETS = frozenset(
+    {
+        "dev-secret-change-me",
+        "change-me-to-a-long-random-string",
+        "change-me-to-a-long-random-string-at-least-32-chars",
+        "doi-chuoi-nay-thanh-mot-chuoi-ngau-nhien-dai-it-nhat-32-ky-tu",
+    }
+)
 
 
 class Settings(BaseSettings):
@@ -76,7 +87,19 @@ class Settings(BaseSettings):
     cluster_min_new_senses: int = 5
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # NoDecode: tắt bước tự parse JSON của pydantic-settings để _parse_cors_origins bên
+    # dưới nhận chuỗi thô — xem lý do ở đó.
+    cors_origins: Annotated[list[str], NoDecode] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
+
+    # Regex origin bổ sung, áp dụng CẢ ở production (khác cors_lan_origin_regex vốn chỉ
+    # bật khi DEBUG). Dùng khi FE có domain sinh tự động: mỗi PR trên Cloudflare/Vercel
+    # là một subdomain mới nên không thể liệt kê sẵn trong cors_origins.
+    # Vd: r"^https://[a-z0-9-]+\.vocab-forge\.pages\.dev$"
+    # Để trống = không mở thêm origin nào.
+    cors_origin_regex: str = ""
 
     # Ở chế độ DEBUG, chấp nhận thêm mọi origin nằm trong dải IP nội bộ (RFC 1918) trên
     # bất kỳ cổng nào. Đây là thứ cho phép mở app từ điện thoại cùng Wi-Fi mà không phải
@@ -96,6 +119,51 @@ class Settings(BaseSettings):
         if isinstance(value, str) and not value.strip():
             return None
         return value
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value):
+        """Nhận CORS_ORIGINS ở cả dạng JSON lẫn danh sách phân tách bằng dấu phẩy.
+
+        Mặc định pydantic-settings đòi JSON cho kiểu list, nên gõ
+        `CORS_ORIGINS=https://a.dev,https://b.dev` vào ô biến môi trường của
+        Railway/Render/Fly/Cloudflare là app crash ngay lúc khởi động với một thông báo
+        khó hiểu. Đó là dạng người ta gõ tự nhiên nhất, nên nhận luôn cả hai.
+        """
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return []
+            if text.startswith("["):
+                import json
+
+                value = json.loads(text)
+            else:
+                value = text.split(",")
+        if isinstance(value, list):
+            # Trình duyệt gửi header `Origin` KHÔNG BAO GIỜ có dấu `/` ở cuối, mà
+            # CORSMiddleware so khớp chuỗi chính xác — "https://x/" là lỗi im lặng kinh
+            # điển: cấu hình nhìn đúng nhưng mọi request đều bị chặn.
+            return [str(v).strip().rstrip("/") for v in value if str(v).strip()]
+        return value
+
+    @model_validator(mode="after")
+    def _guard_production(self):
+        """Chặn khởi động khi cấu hình production còn giá trị mặc định của dev.
+
+        Fail nhanh lúc boot tốt hơn nhiều so với chạy được rồi mới phát hiện: JWT_SECRET
+        công khai nghĩa là bất kỳ ai cũng ký được token cho bất kỳ tài khoản nào.
+        """
+        if self.debug:
+            return self
+
+        if self.jwt_secret in _PUBLIC_JWT_SECRETS or len(self.jwt_secret) < 32:
+            raise ValueError(
+                "DEBUG=false nhưng JWT_SECRET vẫn là giá trị mẫu (hoặc ngắn hơn 32 ký "
+                "tự). Sinh chuỗi mới: python -c \"import secrets; "
+                'print(secrets.token_urlsafe(48))"'
+            )
+        return self
 
 
 @lru_cache
