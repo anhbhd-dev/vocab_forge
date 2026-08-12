@@ -35,7 +35,13 @@ logger = logging.getLogger(__name__)
 
 # Giới hạn số lời gọi TTS đồng thời: Kokoro trên CPU chạy xấp xỉ realtime, bắn 20 câu
 # cùng lúc chỉ làm tất cả cùng chậm và ăn hết RAM container.
-_semaphore = asyncio.Semaphore(4)
+#
+# Mức 4 từng làm sập trải nghiệm: lô backfill giọng nam (~1200 lượt) đẩy container TTS
+# lên ~490% CPU và 4.4/7.4GB RAM, process backend hầu như không được lên lịch chạy nữa —
+# cả những endpoint tĩnh không chạm DB cũng timeout hàng chục giây. Vòng REVIEW phải là
+# fast path, nên vòng agent chạy nền KHÔNG được phép giành hết máy: sinh audio chậm gấp
+# đôi thì không ai nhận ra, app đứng hình thì nhận ra ngay.
+_semaphore = asyncio.Semaphore(settings.tts_max_concurrency)
 
 
 def audio_dir() -> Path:

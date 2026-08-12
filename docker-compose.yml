@@ -72,6 +72,15 @@ services:
     # Có GPU NVIDIA thì đổi sang :v0.2.2 (bản gpu) và khai báo deploy.resources.
     image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.2.2
     restart: unless-stopped
+    # Chặn trần tài nguyên. Kokoro bản CPU chạy 4 request song song sẽ ăn ~450% CPU và
+    # ~4.5GB RAM, bỏ đói backend tới mức /openapi.json cũng timeout — tức là cả vòng
+    # REVIEW (vốn phải là fast path) chết theo trong lúc vòng agent sinh audio nền.
+    # Sinh audio chậm hơn vài phút không ai để ý; app đứng hình thì để ý ngay.
+    deploy:
+      resources:
+        limits:
+          cpus: '5.0'
+          memory: 3g
     ports:
       # Mở ra host để thử nhanh bằng curl; app không cần cổng này.
       - "${VF_TTS_PORT:-8880}:8880"
@@ -96,7 +105,9 @@ services:
         condition: service_started
     environment:
       # Trình duyệt gọi API qua host, không qua tên service trong mạng compose.
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      # Để trống ở dev: frontend tự suy ra "cùng host đang mở, cổng 8000" nên mở bằng
+      # localhost hay bằng IP LAN (điện thoại) đều chạy mà không cần đổi biến này.
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     ports:
       - "${VF_WEB_PORT:-5173}:5173"
     volumes:

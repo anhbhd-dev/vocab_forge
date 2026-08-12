@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # Chậm hơn realtime một chút: người học cần nghe rõ từng âm, không phải nghe kể chuyện.
     tts_speed: float = 0.9
     tts_timeout_seconds: float = 120.0
+    # Số lời gọi TTS chạy cùng lúc. Đây là van điều tiết giữa vòng agent và vòng review:
+    # Kokoro bản CPU ăn ~120% CPU mỗi luồng, để 4 là nó nuốt trọn máy và làm API đứng
+    # hình. 2 vẫn nhanh hơn realtime mà còn chừa chỗ cho request của người đang học.
+    tts_max_concurrency: int = 2
     audio_dir: str = "/app/audio"
 
     # SRS
@@ -73,6 +77,17 @@ class Settings(BaseSettings):
 
     # CORS
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    # Ở chế độ DEBUG, chấp nhận thêm mọi origin nằm trong dải IP nội bộ (RFC 1918) trên
+    # bất kỳ cổng nào. Đây là thứ cho phép mở app từ điện thoại cùng Wi-Fi mà không phải
+    # ghi cứng IP LAN vào cấu hình — IP do router cấp và có thể đổi bất cứ lúc nào.
+    # KHÔNG bật ở production: DEBUG=false thì regex này là None và chỉ còn cors_origins.
+    cors_lan_origin_regex: str = (
+        r"^http://(localhost|127\.0\.0\.1"
+        r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+        r"|192\.168\.\d{1,3}\.\d{1,3}"
+        r"|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$"
+    )
 
     @field_validator("llm_fallback_provider", mode="before")
     @classmethod

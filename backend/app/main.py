@@ -78,6 +78,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    # Chỉ ở dev: mở thêm cho máy khác trong mạng nội bộ (điện thoại cùng Wi-Fi).
+    allow_origin_regex=settings.cors_lan_origin_regex if settings.debug else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

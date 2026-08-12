@@ -19,7 +19,16 @@ import type {
   User,
 } from './types'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+/**
+ * Gốc của API.
+ *
+ * Không đặt cứng `localhost`: khi mở app từ điện thoại trong cùng Wi-Fi, `localhost` là
+ * chính cái điện thoại chứ không phải máy chạy server. Mặc định vì thế là "cùng host với
+ * trang đang mở, cổng 8000" — mở bằng IP LAN nào thì API tự trỏ đúng IP đó, không phải
+ * sửa cấu hình mỗi lần router đổi IP. Khi deploy thật, đặt VITE_API_BASE_URL để ghi đè.
+ */
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`
 const TOKEN_KEY = 'vf-token'
 
 /**
